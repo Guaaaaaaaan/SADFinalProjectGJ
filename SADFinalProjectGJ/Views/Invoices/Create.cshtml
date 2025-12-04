@@ -1,0 +1,121 @@
+﻿@model SADFinalProjectGJ.ViewModels.InvoiceCreateViewModel
+
+@{
+    ViewData["Title"] = "Create Invoice";
+    // 把后端的商品列表转成 JSON，给 JS 使用
+    var itemsJson = System.Text.Json.JsonSerializer.Serialize(ViewBag.ItemList);
+}
+
+<h1>Create Invoice</h1>
+
+<div class="row">
+    <div class="col-md-12">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">Invoice Details</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label asp-for="ClientId" class="control-label">Client</label>
+                                <select asp-for="ClientId" class="form-control" asp-items="ViewBag.ClientId"></select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label asp-for="DueDate" class="control-label">Due Date</label>
+                                <input asp-for="DueDate" class="form-control" />
+                                <span asp-validation-for="DueDate" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    Items
+                    <button type="button" class="btn btn-sm btn-success float-end" onclick="addItemRow()" style="float: right;">+ Add Item</button>
+                </div>
+                <div class="card-body">
+                    <table class="table" id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Item / Service</th>
+                                <th style="width: 20%;">Quantity</th>
+                                <th style="width: 10%;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Create Invoice" class="btn btn-primary btn-lg" />
+                <a asp-action="Index" class="btn btn-secondary btn-lg">Back to List</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        // 1. 获取后端传过来的所有商品数据
+        var allItems = @Html.Raw(itemsJson);
+        var itemIndex = 0; // 用来给每一行编号
+
+        // 2. 这是“添加行”的函数
+        function addItemRow() {
+            var tableBody = document.querySelector("#itemsTable tbody");
+            var rowId = "itemRow_" + itemIndex;
+
+            // 构建下拉菜单的选项
+            var optionsHtml = '<option value="">-- Select Item --</option>';
+            allItems.forEach(function(item) {
+                // 显示格式: "Web Design ($500.00)"
+                optionsHtml += `<option value="${item.ItemId}">${item.Description} ($${item.UnitPrice})</option>`;
+            });
+
+            // 构建新的一行 HTML
+            // 注意 name="Items[0].ItemId" 这种格式，是 MVC 绑定的关键
+            var newRowHtml = `
+                <tr id="${rowId}">
+                    <td>
+                        <select name="Items[${itemIndex}].ItemId" class="form-control" required>
+                            ${optionsHtml}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" name="Items[${itemIndex}].Quantity" class="form-control" value="1" min="1" required />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-danger" onclick="removeRow('${rowId}')">Remove</button>
+                    </td>
+                </tr>
+            `;
+
+            // 插入到表格里
+            tableBody.insertAdjacentHTML('beforeend', newRowHtml);
+            itemIndex++; // 编号+1
+        }
+
+        // 3. 这是“删除行”的函数
+        function removeRow(rowId) {
+            var row = document.getElementById(rowId);
+            row.remove();
+        }
+
+        // 页面加载时自动先加一行
+        document.addEventListener("DOMContentLoaded", function() {
+            addItemRow();
+        });
+    </script>
+}

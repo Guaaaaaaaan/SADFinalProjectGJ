@@ -1,0 +1,106 @@
+﻿@model SADFinalProjectGJ.ViewModels.DashboardViewModel
+
+@{
+    ViewData["Title"] = "Executive Dashboard";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a asp-controller="Invoices" asp-action="Create" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> New Invoice
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-success mb-3 shadow-sm h-100">
+            <div class="card-header">Total Estimated Revenue</div>
+            <div class="card-body">
+                <h2 class="card-title display-6">@Model.TotalRevenue.ToString("C")</h2>
+                <p class="card-text">Accumulated from all invoices</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card text-white bg-warning mb-3 shadow-sm h-100">
+            <div class="card-header">Pending Actions</div>
+            <div class="card-body">
+                <h2 class="card-title display-6">@Model.PendingInvoicesCount</h2>
+                <p class="card-text">Invoices in Draft or Sent status</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card text-white bg-info mb-3 shadow-sm h-100">
+            <div class="card-header">Total Clients</div>
+            <div class="card-body">
+                <h2 class="card-title display-6">@Model.TotalClientsCount</h2>
+                <p class="card-text">Active customer profiles</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light">
+        <i class="bi bi-clock-history"></i> Recent Invoices
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Client</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.RecentInvoices != null && Model.RecentInvoices.Any())
+                {
+                    @foreach (var invoice in Model.RecentInvoices)
+                    {
+                        <tr>
+                            <td>@invoice.InvoiceNumber</td>
+                            <td>@(invoice.Client?.Name ?? "Unknown")</td>
+                            <td>@invoice.IssueDate.ToShortDateString()</td>
+                            <td>@((invoice.TotalAmount + invoice.TaxAmount).ToString("C"))</td>
+                            <td>
+                                @if (invoice.Status == "Paid")
+                                {
+                                    <span class="badge bg-success">Paid</span>
+                                }
+                                else if (invoice.Status == "Draft")
+                                {
+                                    <span class="badge bg-secondary">Draft</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">@invoice.Status</span>
+                                }
+                            </td>
+                            <td>
+                                <a asp-controller="Invoices" asp-action="Details" asp-route-id="@invoice.InvoiceId" class="btn btn-sm btn-outline-primary">View</a>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No invoices found. Start by creating one!</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer text-center">
+        <a asp-controller="Invoices" asp-action="Index" class="text-decoration-none">View All Invoices</a>
+    </div>
+</div>
