@@ -1,124 +1,59 @@
 ﻿@model SADFinalProjectGJ.Models.Payment
-@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
 @{
-    ViewData["Title"] = "Create Payment";
-    // 从 appsettings 或 User Secrets 获取 Publishable Key
-    string publishableKey = Configuration["Stripe:PublishableKey"];
+    ViewData["Title"] = "Pay Invoice";
 }
 
-<h2>Make a Payment</h2>
+<h1>Make Payment</h1>
 
+<h3>Paying for Invoice: @ViewBag.InvoiceNumber</h3>
+<hr />
 <div class="row">
-    <div class="col-md-6">
-        <div class="form-group mb-3">
-            <label class="control-label">Select Invoice to Pay</label>
-            <select id="invoice-selector" class="form-control" asp-items="ViewBag.InvoiceId">
-                <option value="">-- Select an Invoice --</option>
-            </select>
-        </div>
+    <div class="col-md-4">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-        <div id="payment-section" style="display:none; border:1px solid #ccc; padding:20px; border-radius:8px;">
-            <form id="payment-form">
-                <div id="payment-element">
-                </div>
+            @* ✅ 隐藏 InvoiceId，不让用户改 *@
+            <input type="hidden" asp-for="InvoiceId" />
 
-                <button id="submit-button" class="btn btn-primary mt-3" style="width:100%">
-                    <span id="button-text">Pay Now</span>
-                    <span id="spinner" style="display: none;">Processing...</span>
-                </button>
+            <div class="form-group">
+                <label asp-for="PaymentDate" class="control-label"></label>
+                <input asp-for="PaymentDate" class="form-control" readonly />
+            </div>
 
-                <div id="payment-message" class="text-danger mt-2"></div>
-            </form>
-        </div>
+            <div class="form-group">
+                <label asp-for="Amount" class="control-label"></label>
+                @* ✅ 设为只读，防止用户修改金额 *@
+                <input asp-for="Amount" class="form-control" readonly />
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Method" class="control-label">Payment Method</label>
+                <select asp-for="Method" class="form-control">
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="PayPal">PayPal</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="TransactionId" class="control-label">Transaction ID (Optional)</label>
+                <input asp-for="TransactionId" class="form-control" placeholder="e.g. TXN-123456" />
+            </div>
+
+            @* 默认状态 Completed *@
+            <input type="hidden" asp-for="Status" value="Completed" />
+
+            <div class="form-group mt-3">
+                <input type="submit" value="Confirm Payment" class="btn btn-success" />
+                <a asp-controller="Invoices" asp-action="Index" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
     </div>
 </div>
 
-<script src="https://js.stripe.com/v3/"></script>
-
-<script>
-    // 1. 初始化 Stripe
-    const stripe = Stripe('@publishableKey');
-    let elements;
-
-    const invoiceSelector = document.getElementById('invoice-selector');
-    const paymentSection = document.getElementById('payment-section');
-
-    // 2. 监听：当用户选择了某个 Invoice
-    invoiceSelector.addEventListener('change', async function(e) {
-        const invoiceId = e.target.value;
-
-        if (!invoiceId) {
-            paymentSection.style.display = 'none';
-            return;
-        }
-
-        // 显示支付区域
-        paymentSection.style.display = 'block';
-
-        // 3. 调用你的后端接口 CreatePaymentIntent
-        // 注意：这里 fetch 的 URL 要和你 Controller 里的路由一致
-        const response = await fetch("/Payments/CreatePaymentIntent", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ invoiceId: parseInt(invoiceId) }),
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-            showMessage(data.error);
-            return;
-        }
-
-        const clientSecret = data.clientSecret;
-
-        // 4. 创建并挂载 Stripe Elements (支付框)
-        const appearance = { theme: 'stripe' };
-        elements = stripe.elements({ appearance, clientSecret });
-
-        const paymentElement = elements.create("payment");
-        paymentElement.mount("#payment-element");
-    });
-
-    // 5. 监听：当用户点击“Pay Now”按钮
-    document.querySelector("#payment-form").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
-        // 向 Stripe 确认支付
-        const { error } = await stripe.confirmPayment({
-            elements,
-            confirmParams: {
-                // 支付成功后跳转的页面 (通常是你的 Index 或者一个 Thank You 页面)
-                return_url: window.location.origin + "/Payments/Index",
-            },
-        });
-
-        if (error) {
-            showMessage(error.message);
-            setLoading(false);
-        } else {
-            // 如果成功，stripe.confirmPayment 会自动跳转页面，所以这里不需要写逻辑
-        }
-    });
-
-    // --- 辅助函数：显示消息 ---
-    function showMessage(messageText) {
-        const messageContainer = document.querySelector("#payment-message");
-        messageContainer.textContent = messageText;
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
-
-    // --- 辅助函数：按钮 Loading 状态 ---
-    function setLoading(isLoading) {
-        if (isLoading) {
-            document.querySelector("#submit-button").disabled = true;
-            document.querySelector("#spinner").style.display = "inline";
-            document.querySelector("#button-text").style.display = "none";
-        } else {
-            document.querySelector("#submit-button").disabled = false;
-            document.querySelector("#spinner").style.display = "none";
-            document.querySelector("#button-text").style.display = "inline";
-        }
-    }
-</script>
+}

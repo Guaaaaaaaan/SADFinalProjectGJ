@@ -110,20 +110,32 @@ namespace SADFinalProjectGJ.Areas.Identity.Pages.Account
         {
             returnUrl ??= Url.Content("~/");
             ExternalLogins = (await _signInManager.GetExternalAuthenticationSchemesAsync()).ToList();
+
             if (ModelState.IsValid)
             {
                 var user = CreateUser();
 
                 await _userStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
                 await _emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+
+                // 1. 创建用户
                 var result = await _userManager.CreateAsync(user, Input.Password);
 
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User created a new account with password.");
 
+                    // ==============================================================
+                    // 2. 【新增代码】: 在这里自动分配 "Client" 角色
+                    // ⚠️ 注意：请确保你的数据库 AspNetRoles 表里已经有 "Client" 这个角色，否则会报错
+                    // ==============================================================
+                    await _userManager.AddToRoleAsync(user, "Client");
+                    // ==============================================================
+
                     var userId = await _userManager.GetUserIdAsync(user);
                     var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+
+                    // ... (后面的代码不需要动)
                     code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
                     var callbackUrl = Url.Page(
                         "/Account/ConfirmEmail",

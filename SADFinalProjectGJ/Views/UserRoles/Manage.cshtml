@@ -1,0 +1,70 @@
+﻿@using SADFinalProjectGJ.Models
+@model List<ManageUserRolesViewModel>
+
+@{
+    ViewData["Title"] = "Manage User Roles";
+    var userId = ViewBag.UserId;
+    var userName = ViewBag.UserName;
+}
+
+<h2>Manage Roles for @userName</h2>
+
+<form method="post">
+    <div class="card">
+        <div class="card-header">
+            <h2>Manage User Roles</h2>
+        </div>
+        <div class="card-body">
+            @for (int i = 0; i < Model.Count; i++)
+            {
+                <div class="form-check m-1">
+                    <input type="hidden" asp-for="@Model[i].RoleId" />
+                    <input type="hidden" asp-for="@Model[i].RoleName" />
+
+                    @* 我们保留 Checkbox 以确保后端能收到数据。
+                       添加了 'exclusive-role' 类，用于 JS 识别这些需要互斥的角色。
+                    *@
+                    <input asp-for="@Model[i].Selected" class="form-check-input exclusive-role" />
+
+                    <label class="form-check-label" asp-for="@Model[i].Selected">
+                        @Model[i].RoleName
+                    </label>
+                </div>
+            }
+            <div asp-validation-summary="All" class="text-danger"></div>
+        </div>
+        <div class="card-footer">
+            <input type="submit" value="Update" class="btn btn-primary" style="width:auto" />
+            <a asp-action="Index" class="btn btn-secondary" style="width:auto">Cancel</a>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // 定义互斥的角色组 (如果你以后有 Manager，直接加进数组即可)
+            var exclusiveRoles = ['Admin', 'FinanceStaff', 'Client'];
+
+            // 监听带有 .exclusive-role 类的复选框
+            $('.exclusive-role').change(function () {
+                if ($(this).is(':checked')) {
+                    var currentRole = $(this).siblings('label').text().trim();
+
+                    // 只有当点击的角色属于互斥组时，才执行互斥逻辑
+                    if (exclusiveRoles.includes(currentRole)) {
+                        // 遍历所有互斥角色的复选框
+                        $('.exclusive-role').each(function () {
+                            var otherRole = $(this).siblings('label').text().trim();
+
+                            // 如果是互斥组里的其他角色，就取消勾选
+                            if (exclusiveRoles.includes(otherRole) && otherRole !== currentRole) {
+                                $(this).prop('checked', false);
+                            }
+                        });
+                    }
+                }
+            });
+        });
+    </script>
+}

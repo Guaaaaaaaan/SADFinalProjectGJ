@@ -12,6 +12,9 @@ namespace SADFinalProjectGJ.Models // 修正拼写
         // 修改1：使用 string 类型来匹配 IdentityUser 的 ID
         public string? UserId { get; set; }
 
+        // ✅ 新增：把 Client 数据和登录账号关联起来
+        // 这里存 Client 的登录邮箱 (因为它比较直观，注册时也好填)
+        public string? AccountEmail { get; set; }
         // 修改2：添加导航属性，建立外键关联
         [ForeignKey("UserId")]
         public IdentityUser? User { get; set; }

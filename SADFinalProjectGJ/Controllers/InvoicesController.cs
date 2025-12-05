@@ -1,160 +1,155 @@
-﻿using SADFinalProjectGJ.ViewModels;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization; // 权限控制
+using Microsoft.AspNetCore.Identity;      // 用户身份
 using SADFinalProjectGJ.Data;
 using SADFinalProjectGJ.Models;
-
+using SADFinalProjectGJ.ViewModels;       // 确保引用了 ViewModel
 
 namespace SADFinalProjectGJ.Controllers
 {
+    [Authorize]
     public class InvoicesController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly UserManager<IdentityUser> _userManager;
 
-        public InvoicesController(ApplicationDbContext context)
+        public InvoicesController(ApplicationDbContext context, UserManager<IdentityUser> userManager)
         {
             _context = context;
+            _userManager = userManager;
         }
 
         // GET: Invoices
         public async Task<IActionResult> Index()
         {
-            var applicationDbContext = _context.Invoices.Include(i => i.Client);
-            return View(await applicationDbContext.ToListAsync());
+            var query = _context.Invoices.Include(i => i.Client).AsQueryable();
+
+            if (User.IsInRole("Client"))
+            {
+                var currentUserId = _userManager.GetUserId(User);
+                // 只有 Client 关联了 UserId 才能过滤
+                // 如果你的 Client 表还没有 UserId 字段，这里会报错，请确认你是否做了 Migration
+                query = query.Where(i => i.Client.UserId == currentUserId);
+            }
+
+            return View(await query.ToListAsync());
         }
 
         // GET: Invoices/Details/5
-        // GET: Invoices/Details/5
         public async Task<IActionResult> Details(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var invoice = await _context.Invoices
-                .Include(i => i.Client) // 读取客户信息
-                .Include(i => i.InvoiceItems)! // ✅ 新增：读取发票里的商品列表
-                    .ThenInclude(ii => ii.Item) // ✅ 新增：顺便把商品的名字/单价也读出来
+                .Include(i => i.Client)
+                .Include(i => i.InvoiceItems)!
+                    .ThenInclude(ii => ii.Item)
                 .FirstOrDefaultAsync(m => m.InvoiceId == id);
 
-            if (invoice == null)
+            if (invoice == null) return NotFound();
+
+            if (User.IsInRole("Client"))
             {
-                return NotFound();
+                var currentUserId = _userManager.GetUserId(User);
+                if (invoice.Client == null || invoice.Client.UserId != currentUserId)
+                {
+                    return Forbid();
+                }
             }
 
             return View(invoice);
         }
+
+        // GET: Invoices/Create
+        [Authorize(Roles = "Admin,FinanceStaff")]
         public IActionResult Create()
         {
-            // 1. 把所有客户取出来，放到下拉菜单里
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name");
-
-            // 2. 把所有商品取出来，告诉网页有哪些商品可选 (这是为了给 JavaScript 用)
+            // 确保你 Items 表里有数据，否则下拉框是空的
             ViewBag.ItemList = _context.Items.ToList();
-
-            // 3. 传一个空的 ViewModel 给页面
             return View(new InvoiceCreateViewModel());
         }
 
         // POST: Invoices/Create
-        // 这个方法负责接收数据并保存
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> Create(InvoiceCreateViewModel model)
         {
             if (ModelState.IsValid)
             {
-                // A. 先创建发票的“头” (Header)
                 var invoice = new Invoice
                 {
-                    // 自动生成发票号：INV-年月日-时分秒 (例如 INV-20251204-103000)
                     InvoiceNumber = "INV-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"),
                     ClientId = model.ClientId,
                     IssueDate = DateTime.Now,
                     DueDate = model.DueDate,
-                    Status = "Draft", // 默认状态是草稿
-                    InvoiceItems = new List<InvoiceItem>() // 准备好装商品的篮子
+                    Status = "Draft",
+                    InvoiceItems = new List<InvoiceItem>()
                 };
 
                 decimal calculatedTotal = 0;
 
-                // B. 循环处理用户提交的每一个商品
                 if (model.Items != null && model.Items.Count > 0)
                 {
                     foreach (var entry in model.Items)
                     {
-                        // 安全检查：去数据库查最新的价格 (防止用户在前端篡改价格)
                         var dbItem = await _context.Items.FindAsync(entry.ItemId);
-
                         if (dbItem != null)
                         {
-                            var lineTotal = dbItem.UnitPrice * entry.Quantity; // 单价 x 数量
-
+                            var lineTotal = dbItem.UnitPrice * entry.Quantity;
                             var invoiceItem = new InvoiceItem
                             {
                                 ItemId = entry.ItemId,
                                 Quantity = entry.Quantity,
-                                UnitPrice = dbItem.UnitPrice, // 存入当时的价格
+                                UnitPrice = dbItem.UnitPrice,
                                 Total = lineTotal
                             };
 
-                            invoice.InvoiceItems.Add(invoiceItem); // 放进篮子
-                            calculatedTotal += lineTotal; // 累加总金额
+                            invoice.InvoiceItems.Add(invoiceItem);
+                            calculatedTotal += lineTotal;
                         }
                     }
                 }
 
-                // C. 最后填入总金额和税
                 invoice.TotalAmount = calculatedTotal;
-                invoice.TaxAmount = calculatedTotal * 0.09m; // 假设 9% GST
+                invoice.TaxAmount = calculatedTotal * 0.09m;
 
-                // D. 保存到数据库
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();
-
-                // 成功后跳转到列表页
                 return RedirectToAction(nameof(Index));
             }
-
-            // 如果失败 (比如没选客户)，重新加载数据返回页面
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", model.ClientId);
             ViewBag.ItemList = _context.Items.ToList();
             return View(model);
         }
+
         // GET: Invoices/Edit/5
+        [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> Edit(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var invoice = await _context.Invoices.FindAsync(id);
-            if (invoice == null)
-            {
-                return NotFound();
-            }
+            if (invoice == null) return NotFound();
+
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", invoice.ClientId);
             return View(invoice);
         }
 
         // POST: Invoices/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> Edit(int id, [Bind("InvoiceId,InvoiceNumber,Status,Notes,TotalAmount,TaxAmount,ClientId,IssueDate,DueDate")] Invoice invoice)
         {
-            if (id != invoice.InvoiceId)
-            {
-                return NotFound();
-            }
+            if (id != invoice.InvoiceId) return NotFound();
 
             if (ModelState.IsValid)
             {
@@ -165,14 +160,8 @@ namespace SADFinalProjectGJ.Controllers
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!InvoiceExists(invoice.InvoiceId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    if (!InvoiceExists(invoice.InvoiceId)) return NotFound();
+                    else throw;
                 }
                 return RedirectToAction(nameof(Index));
             }
@@ -181,20 +170,15 @@ namespace SADFinalProjectGJ.Controllers
         }
 
         // GET: Invoices/Delete/5
+        [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
+            if (id == null) return NotFound();
 
             var invoice = await _context.Invoices
                 .Include(i => i.Client)
                 .FirstOrDefaultAsync(m => m.InvoiceId == id);
-            if (invoice == null)
-            {
-                return NotFound();
-            }
+            if (invoice == null) return NotFound();
 
             return View(invoice);
         }
@@ -202,6 +186,7 @@ namespace SADFinalProjectGJ.Controllers
         // POST: Invoices/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var invoice = await _context.Invoices.FindAsync(id);

@@ -23,6 +23,7 @@ namespace SADFinalProjectGJ.Models
 
         [StringLength(20)] // e.g. "Success", "Failed"
         public string? Status { get; set; }
+        [ForeignKey("InvoiceId")]
         public Invoice? Invoice { get; set; }
 
         public string? GatewayName { get; set; }

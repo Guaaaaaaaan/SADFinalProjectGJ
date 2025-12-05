@@ -1,0 +1,62 @@
+﻿@using SADFinalProjectGJ.Models
+@model List<UserRolesViewModel>
+
+@{
+    ViewData["Title"] = "User Roles Manager";
+}
+
+<h1>User Roles Manager</h1>
+
+<!-- 1. 新增：消息提示区 (用于显示 Controller 传回来的成功或错误信息) -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Email</th>
+            <th>Roles</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model)
+        {
+            <tr>
+                <td>@user.Email</td>
+                <td>@string.Join(", ", user.Roles)</td>
+                <td>
+                    <!-- 使用 flex 布局让按钮并排显示 -->
+                    <div class="d-flex gap-2">
+                        <!-- 原有的 Manage 按钮 -->
+                        <a class="btn btn-primary btn-sm" asp-controller="UserRoles" asp-action="Manage" asp-route-userId="@user.UserId">
+                            Manage Roles
+                        </a>
+
+                        <!-- 2. 新增：删除按钮 -->
+                        <!-- 注意：必须使用 form post 提交，不能直接用 a 标签，是为了安全 -->
+                        <form asp-action="Delete" asp-route-userId="@user.UserId" method="post"
+                              onsubmit="return confirm('Are you sure you want to delete user [@user.Email]? This action cannot be undone.');">
+
+                            <button type="submit" class="btn btn-danger btn-sm">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

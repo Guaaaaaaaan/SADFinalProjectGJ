@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SADFinalProjectGJ.Data;
 using Stripe;
@@ -23,6 +23,37 @@ builder.Services.AddControllersWithViews();
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
 var app = builder.Build();
+// ... 前面有很多 builder.Services.Add... 代码 ...
+
+// ==================== ✅ 开始插入这段代码 ====================
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
+        // 这里定义你需要的所有角色
+        var roles = new[] { "Admin", "FinanceStaff", "Client" };
+
+        foreach (var role in roles)
+        {
+            // 如果角色不存在，就创建一个
+            if (!await roleManager.RoleExistsAsync(role))
+            {
+                await roleManager.CreateAsync(new IdentityRole(role));
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "在创建角色时发生了错误");
+    }
+}
+// ==================== 结束插入 ====================
+
+// ... 后面是 app.UseHttpsRedirection(); 等等 ...
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
