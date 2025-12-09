@@ -6,11 +6,15 @@
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Dashboard</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <a asp-controller="Invoices" asp-action="Create" class="btn btn-sm btn-primary">
-            <i class="bi bi-plus-lg"></i> New Invoice
-        </a>
-    </div>
+
+    @if (!User.IsInRole("Client"))
+    {
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a asp-controller="Invoices" asp-action="Create" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg"></i> New Invoice
+            </a>
+        </div>
+    }
 </div>
 
 <div class="row mb-4">
@@ -53,7 +57,7 @@
         <table class="table table-hover mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>Invoice #</th>
+                    <th>Invoice </th>
                     <th>Client</th>
                     <th>Date</th>
                     <th>Amount</th>

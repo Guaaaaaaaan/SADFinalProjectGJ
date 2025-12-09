@@ -52,10 +52,13 @@
         <div class="btn-toolbar">
 
             @if (Model.Status == "Draft")
-            {
-                <a asp-action="Edit" asp-route-id="@Model.InvoiceId" class="btn btn-warning me-2">
-                    <i class="bi bi-pencil"></i> Edit
-                </a>
+            {@* 增加判断：只有状态是 Draft 且 当前用户不是 Client 时，才显示编辑按钮 *@
+                @if (!User.IsInRole("Client"))
+                {
+                    <a asp-action="Edit" asp-route-id="@Model.InvoiceId" class="btn btn-warning me-2">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                }
             }
 
             @if (Model.Status != "Paid")

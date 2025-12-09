@@ -1,41 +1,63 @@
 ﻿@model IEnumerable<SADFinalProjectGJ.Models.Item>
 
 @{
-    ViewData["Title"] = "Index";
+    ViewData["Title"] = "Services & Items";
 }
 
-<h1>Index</h1>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800 fw-bold">Service Items</h1>
+            <p class="text-muted mb-0">Manage your catalog of services and products.</p>
+        </div>
+        <a asp-action="Create" class="btn btn-success btn-lg shadow-sm rounded-pill px-4">
+            <i class="bi bi-plus-lg me-2"></i>Add New Item
+        </a>
+    </div>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
-<table class="table">
-    <thead>
-        <tr>
-            <th>
-                @Html.DisplayNameFor(model => model.Description)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.UnitPrice)
-            </th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-@foreach (var item in Model) {
-        <tr>
-            <td>
-                @Html.DisplayFor(modelItem => item.Description)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.UnitPrice)
-            </td>
-            <td>
-                <a asp-action="Edit" asp-route-id="@item.ItemId">Edit</a> |
-                <a asp-action="Details" asp-route-id="@item.ItemId">Details</a> |
-                <a asp-action="Delete" asp-route-id="@item.ItemId">Delete</a>
-            </td>
-        </tr>
-}
-    </tbody>
-</table>
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-0">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4 py-3 text-uppercase text-secondary small fw-bold" style="width: 60%;">
+                            @Html.DisplayNameFor(model => model.Description)
+                        </th>
+                        <th class="py-3 text-uppercase text-secondary small fw-bold">
+                            @Html.DisplayNameFor(model => model.UnitPrice)
+                        </th>
+                        <th class="pe-4 text-end py-3 text-uppercase text-secondary small fw-bold">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td class="ps-4 py-3">
+                                <span class="fw-medium text-dark">@Html.DisplayFor(modelItem => item.Description)</span>
+                            </td>
+                            <td class="py-3">
+                                <span class="badge bg-light text-success border border-success fs-6 fw-normal">
+                                    @Html.DisplayFor(modelItem => item.UnitPrice)
+                                </span>
+                            </td>
+                            <td class="pe-4 text-end">
+                                <a asp-action="Edit" asp-route-id="@item.ItemId" class="btn btn-icon btn-sm btn-light text-primary mx-1" title="Edit">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                                <a asp-action="Details" asp-route-id="@item.ItemId" class="btn btn-icon btn-sm btn-light text-info mx-1" title="Details">
+                                    <i class="bi bi-eye-fill"></i>
+                                </a>
+                                <a asp-action="Delete" asp-route-id="@item.ItemId" class="btn btn-icon btn-sm btn-light text-danger mx-1" title="Delete">
+                                    <i class="bi bi-trash-fill"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
