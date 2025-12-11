@@ -26,17 +26,34 @@ namespace SADFinalProjectGJ.Controllers
         }
 
         // GET: Invoices
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string searchString)
         {
+            // 1. 基础查询：预加载 Client 数据
             var query = _context.Invoices.Include(i => i.Client).AsQueryable();
 
+            // 2. 权限控制 (Security Filter)
+            // 必须在搜索前执行：Client 只能在自己的数据池里搜
             if (User.IsInRole("Client"))
             {
                 var currentUserId = _userManager.GetUserId(User);
-                // 只有 Client 关联了 UserId 才能过滤
-                // 如果你的 Client 表还没有 UserId 字段，这里会报错，请确认你是否做了 Migration
                 query = query.Where(i => i.Client.UserId == currentUserId);
             }
+
+            // 3. 多字段搜索 (Search Filter)
+            if (!string.IsNullOrEmpty(searchString))
+            {
+                // 支持搜索：发票号、客户名、状态、金额
+                query = query.Where(i =>
+                    i.InvoiceNumber.Contains(searchString) ||
+                    (i.Client != null && i.Client.Name.Contains(searchString)) ||
+                    (i.Status != null && i.Status.Contains(searchString)) ||
+                    // 将金额转为字符串进行模糊匹配 (例如搜 "200" 能找到 "200.00")
+                    i.TotalAmount.ToString().Contains(searchString)
+                );
+            }
+
+            // 将搜索词回传给前端，保持输入框里有字
+            ViewData["CurrentFilter"] = searchString;
 
             return View(await query.ToListAsync());
         }
@@ -136,10 +153,19 @@ namespace SADFinalProjectGJ.Controllers
         {
             if (id == null) return NotFound();
 
-            var invoice = await _context.Invoices.FindAsync(id);
+            var invoice = await _context.Invoices
+                .Include(i => i.InvoiceItems) // 必须包含原有商品
+                .FirstOrDefaultAsync(m => m.InvoiceId == id);
+
             if (invoice == null) return NotFound();
 
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", invoice.ClientId);
+
+            // ✅ 修复点：只选择需要的字段，防止 JSON 序列化报错
+            ViewBag.ItemList = await _context.Items
+                .Select(i => new { i.ItemId, i.Description, i.UnitPrice })
+                .ToListAsync();
+
             return View(invoice);
         }
 
@@ -147,15 +173,72 @@ namespace SADFinalProjectGJ.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,FinanceStaff")]
-        public async Task<IActionResult> Edit(int id, [Bind("InvoiceId,InvoiceNumber,Status,Notes,TotalAmount,TaxAmount,ClientId,IssueDate,DueDate")] Invoice invoice)
+        // 3. 修改：在 Bind 中添加 "InvoiceItems"，允许绑定商品列表
+        public async Task<IActionResult> Edit(int id, [Bind("InvoiceId,InvoiceNumber,Status,Notes,TotalAmount,TaxAmount,ClientId,IssueDate,DueDate,InvoiceItems")] Invoice invoice)
         {
             if (id != invoice.InvoiceId) return NotFound();
+
+            // ✅ 修复点：移除对 Items 细节的校验，因为我们会在下面手动处理
+            ModelState.Remove("InvoiceItems");
+
+            // 4. 读取数据库中的原始数据（为了追踪更新）
+            var dbInvoice = await _context.Invoices
+                .Include(i => i.InvoiceItems)
+                .FirstOrDefaultAsync(i => i.InvoiceId == id);
+
+            if (dbInvoice == null) return NotFound();
 
             if (ModelState.IsValid)
             {
                 try
                 {
-                    _context.Update(invoice);
+                    // 5. 更新基本字段
+                    dbInvoice.InvoiceNumber = invoice.InvoiceNumber;
+                    dbInvoice.Status = invoice.Status;
+                    dbInvoice.Notes = invoice.Notes;
+                    dbInvoice.ClientId = invoice.ClientId;
+                    dbInvoice.IssueDate = invoice.IssueDate;
+                    dbInvoice.DueDate = invoice.DueDate;
+
+                    // 6. 处理 InvoiceItems (核心逻辑)
+                    // 策略：清空旧的 -> 重新添加新的
+                    if (dbInvoice.InvoiceItems != null)
+                    {
+                        _context.InvoiceItems.RemoveRange(dbInvoice.InvoiceItems);
+                    }
+
+                    dbInvoice.InvoiceItems = new List<InvoiceItem>();
+                    decimal calculatedTotal = 0;
+
+                    // 遍历前端提交进来的 invoice.InvoiceItems
+                    if (invoice.InvoiceItems != null && invoice.InvoiceItems.Count > 0)
+                    {
+                        foreach (var itemInput in invoice.InvoiceItems)
+                        {
+                            // 即使前端只传了 ItemId 和 Quantity，我们需要去数据库查单价
+                            var dbItem = await _context.Items.FindAsync(itemInput.ItemId);
+                            if (dbItem != null)
+                            {
+                                var lineTotal = dbItem.UnitPrice * itemInput.Quantity;
+
+                                // 创建新的实体加入列表
+                                dbInvoice.InvoiceItems.Add(new InvoiceItem
+                                {
+                                    ItemId = itemInput.ItemId,
+                                    Quantity = itemInput.Quantity,
+                                    UnitPrice = dbItem.UnitPrice, // 使用最新单价
+                                    Total = lineTotal
+                                });
+                                calculatedTotal += lineTotal;
+                            }
+                        }
+                    }
+
+                    // 7. 重新计算总金额
+                    dbInvoice.TotalAmount = calculatedTotal;
+                    dbInvoice.TaxAmount = calculatedTotal * 0.09m; // 假设税率 9%
+
+                    _context.Update(dbInvoice);
                     await _context.SaveChangesAsync();
                 }
                 catch (DbUpdateConcurrencyException)
@@ -165,7 +248,10 @@ namespace SADFinalProjectGJ.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
+
+            // 失败回滚
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", invoice.ClientId);
+            ViewBag.ItemList = _context.Items.ToList();
             return View(invoice);
         }
 

@@ -1,69 +1,189 @@
 ﻿@model SADFinalProjectGJ.Models.Invoice
 
 @{
-    ViewData["Title"] = "Edit";
+    ViewData["Title"] = "Edit Invoice";
+    // 序列化后端传来的简化版商品列表
+    var itemsJson = System.Text.Json.JsonSerializer.Serialize(ViewBag.ItemList);
+
+    // 获取当前发票已有的商品
+    var currentItems = Model.InvoiceItems?.ToList() ?? new List<SADFinalProjectGJ.Models.InvoiceItem>();
+
+    // 因为 ViewBag.ItemList 现在是匿名对象，不能直接强转 List<Item>，我们用 dynamic 循环或者直接依赖 JS
+    // 这里为了首次渲染下拉框，我们直接在 Razor 里用 dynamic
+    var allItemsList = (IEnumerable<dynamic>)ViewBag.ItemList;
 }
 
-<h1>Edit</h1>
+<h1>Edit Invoice</h1>
 
-<h4>Invoice</h4>
-<hr />
 <div class="row">
-    <div class="col-md-4">
-        <form asp-action="Edit">
+    <div class="col-md-12">
+        <form asp-action="Edit" id="editForm">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <input type="hidden" asp-for="InvoiceId" />
-            <div class="form-group">
-                <label asp-for="InvoiceNumber" class="control-label"></label>
-                <input asp-for="InvoiceNumber" class="form-control" />
-                <span asp-validation-for="InvoiceNumber" class="text-danger"></span>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">Invoice Details</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="InvoiceNumber" class="control-label">Invoice Number</label>
+                                <input asp-for="InvoiceNumber" class="form-control" />
+                                <span asp-validation-for="InvoiceNumber" class="text-danger"></span>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label asp-for="ClientId" class="control-label">Client</label>
+                                <select asp-for="ClientId" class="form-control" asp-items="ViewBag.ClientId"></select>
+                                <span asp-validation-for="ClientId" class="text-danger"></span>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label asp-for="Status" class="control-label">Status</label>
+                                <input asp-for="Status" class="form-control" />
+                                <span asp-validation-for="Status" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="IssueDate" class="control-label">Issue Date</label>
+                                <input asp-for="IssueDate" class="form-control" />
+                                <span asp-validation-for="IssueDate" class="text-danger"></span>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label asp-for="DueDate" class="control-label">Due Date</label>
+                                <input asp-for="DueDate" class="form-control" />
+                                <span asp-validation-for="DueDate" class="text-danger"></span>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label asp-for="Notes" class="control-label">Notes</label>
+                                <textarea asp-for="Notes" class="form-control"></textarea>
+                                <span asp-validation-for="Notes" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label asp-for="Status" class="control-label"></label>
-                <input asp-for="Status" class="form-control" />
-                <span asp-validation-for="Status" class="text-danger"></span>
+
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    Items
+                    <button type="button" class="btn btn-sm btn-success float-end" onclick="addItemRow()" style="float: right;">+ Add Item</button>
+                </div>
+                <div class="card-body">
+                    <table class="table" id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Item / Service</th>
+                                <th style="width: 20%;">Quantity</th>
+                                <th style="width: 10%;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @* 循环渲染现有数据 *@
+                            @for (int i = 0; i < currentItems.Count; i++)
+                            {
+                                <tr>
+                                    <td>
+                                        @* 这里的 Name 属性稍后会被 JS 的 reindexRows 重写，所以初始正确即可 *@
+                                        <select name="InvoiceItems[@i].ItemId" class="form-control item-select" required>
+                                            <option value="">-- Select Item --</option>
+                                            @if (allItemsList != null)
+                                            {
+                                                foreach (var item in allItemsList)
+                                                {
+                                                    <!option value="@item.ItemId" @(item.ItemId == currentItems[i].ItemId ? "selected" : "")>
+                                                    @item.Description - $@item.UnitPrice
+                                                    </!option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="InvoiceItems[@i].Quantity" class="form-control item-quantity" value="@currentItems[i].Quantity" min="1" required />
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-danger" onclick="removeRow(this)">Remove</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
             <div class="form-group">
-                <label asp-for="Notes" class="control-label"></label>
-                <input asp-for="Notes" class="form-control" />
-                <span asp-validation-for="Notes" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="TotalAmount" class="control-label"></label>
-                <input asp-for="TotalAmount" class="form-control" />
-                <span asp-validation-for="TotalAmount" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="TaxAmount" class="control-label"></label>
-                <input asp-for="TaxAmount" class="form-control" />
-                <span asp-validation-for="TaxAmount" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="ClientId" class="control-label"></label>
-                <select asp-for="ClientId" class="form-control" asp-items="ViewBag.ClientId"></select>
-                <span asp-validation-for="ClientId" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="IssueDate" class="control-label"></label>
-                <input asp-for="IssueDate" class="form-control" />
-                <span asp-validation-for="IssueDate" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="DueDate" class="control-label"></label>
-                <input asp-for="DueDate" class="form-control" />
-                <span asp-validation-for="DueDate" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <input type="submit" value="Save" class="btn btn-primary" />
+                <input type="submit" value="Save Changes" class="btn btn-primary btn-lg" />
+                <a asp-action="Index" class="btn btn-secondary btn-lg">Back to List</a>
             </div>
         </form>
     </div>
 </div>
 
-<div>
-    <a asp-action="Index">Back to List</a>
-</div>
-
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        // 1. 获取商品数据
+        var allItems = @Html.Raw(itemsJson);
+
+        // 2. 添加新行
+        function addItemRow() {
+            var tableBody = document.querySelector("#itemsTable tbody");
+
+            // 构建下拉菜单
+            var optionsHtml = '<option value="">-- Select Item --</option>';
+            if (allItems) {
+                allItems.forEach(function(item) {
+                    optionsHtml += `<option value="${item.ItemId}">${item.Description} ($${item.UnitPrice})</option>`;
+                });
+            }
+
+            var newRowHtml = `
+                <tr>
+                    <td>
+                        <select class="form-control item-select" required>
+                             ${optionsHtml}
+                        </select>
+                    </td>
+                    <td>
+                       <input type="number" class="form-control item-quantity" value="1" min="1" required />
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-danger" onclick="removeRow(this)">Remove</button>
+                    </td>
+                </tr>
+            `;
+
+            tableBody.insertAdjacentHTML('beforeend', newRowHtml);
+
+            // 添加完立刻重排索引，确保 Name 正确
+            reindexRows();
+        }
+
+        // 3. 删除行
+        function removeRow(btn) {
+            var row = btn.closest('tr');
+            row.remove();
+            // 删除后必须重排，否则索引断开会导致后端接收不到数据
+            reindexRows();
+        }
+
+        // 4. ✅ 核心修复：重排所有行的 Name 索引 [0], [1], [2]...
+        function reindexRows() {
+            var rows = document.querySelectorAll('#itemsTable tbody tr');
+            rows.forEach((row, index) => {
+                var select = row.querySelector('.item-select');
+                var quantity = row.querySelector('.item-quantity');
+
+                if (select) {
+                    select.name = `InvoiceItems[${index}].ItemId`;
+                }
+                if (quantity) {
+                    quantity.name = `InvoiceItems[${index}].Quantity`;
+                }
+            });
+        }
+    </script>
 }

@@ -1,9 +1,4 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
-}
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -11,22 +6,18 @@
     <title>@ViewData["Title"] - IGPTS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
-        body {
-            padding-top: 60px;
-        }
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
-        .footer {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            height: 60px;
-            line-height: 60px;
-            background-color: #f5f5f5;
+    <style>
+        /* 仅保留顶部内边距，防止 Navbar 遮挡内容 */
+        body {
+            padding-top: 70px;
         }
+        /* 移除了原本的 footer fixed 样式，改用下面的 flex 布局完美解决遮挡问题 */
     </style>
 </head>
-<body>
+
+<body class="d-flex flex-column min-vh-100">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3 fixed-top">
             <div class="container-fluid">
@@ -35,51 +26,59 @@
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <ul class="navbar-nav flex-grow-1">
-                    @* 1. Home - 所有人可见 *@
-                    <li class="nav-item">
-                        <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                    </li>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
 
-                    @* 2. 只要登录了，就可以看到 Invoices (Client看自己的，Staff看全部) *@
+                        @if (User.Identity != null && User.Identity.IsAuthenticated)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Invoices</a>
+                            </li>
+                        }
+
+                        @if (User.IsInRole("Admin") || User.IsInRole("FinanceStaff"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Clients" asp-action="Index">Clients</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Items" asp-action="Index">Items</a>
+                            </li>
+                        }
+
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="UserRoles" asp-action="Index">Manage Roles</a>
+                            </li>
+                        }
+                    </ul>
+
                     @if (User.Identity != null && User.Identity.IsAuthenticated)
                     {
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Invoices" asp-action="Index">Invoices</a>
-                        </li>
+                        <form class="d-flex me-3" asp-controller="Invoices" asp-action="Index" method="get">
+                            <input class="form-control me-2" type="search" placeholder="Search "
+                                   name="searchString" value="@ViewData["CurrentFilter"]" aria-label="Search">
+                            <button class="btn btn-outline-primary" type="submit">Search</button>
+                        </form>
                     }
 
-                    @* 3. ✅ 只有 Admin 和 FinanceStaff 才能看到 Clients 和 Items *@
-                    @if (User.IsInRole("Admin") || User.IsInRole("FinanceStaff"))
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Clients" asp-action="Index">Clients</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Items" asp-action="Index">Items</a>
-                        </li>
-                    }
-
-                    @* 4. 只有 Admin 才能看到 Manage Roles *@
-                    @if (User.IsInRole("Admin"))
-                    {
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="UserRoles" asp-action="Index">Manage Roles</a>
-                        </li>
-                    }
-                </ul>
                     <partial name="_LoginPartial" />
+                </div>
             </div>
         </nav>
     </header>
 
-    <div class="container">
+    <div class="container flex-grow-1">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted text-center">
+    <footer class="border-top footer text-muted text-center mt-auto py-3 bg-light">
         <div class="container">
             &copy; 2025 - IGPTS - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
         </div>
@@ -87,6 +86,7 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
