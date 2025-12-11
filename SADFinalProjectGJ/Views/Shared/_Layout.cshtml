@@ -49,12 +49,20 @@
                             </li>
                         }
 
+                        @if (User.IsInRole("Admin") || User.IsInRole("FinanceStaff"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Analytics" asp-action="Index">Analytics</a>
+                            </li>
+                        }
+
                         @if (User.IsInRole("Admin"))
                         {
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-controller="UserRoles" asp-action="Index">Manage Roles</a>
                             </li>
                         }
+                      
                     </ul>
 
                     @if (User.Identity != null && User.Identity.IsAuthenticated)

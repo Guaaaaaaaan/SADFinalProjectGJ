@@ -2,6 +2,14 @@
 
 @{
     ViewData["Title"] = "Invoice Details";
+
+    // 👇👇👇 新增这段计算代码 👇👇👇
+    decimal gstPercentage = 0;
+    if (Model.TotalAmount > 0)
+    {
+        // 反推税率：(税额 ÷ 总额) × 100，并保留2位小数
+        gstPercentage = Math.Round((Model.TaxAmount / Model.TotalAmount) * 100, 2);
+    }
 }
 
 <style>
@@ -148,7 +156,7 @@
                             <td class="text-end">@Model.TotalAmount.ToString("C")</td>
                         </tr>
                         <tr>
-                            <td class="text-end fw-bold">Tax (9%):</td>
+                            <td class="text-end fw-bold">Tax (@gstPercentage.ToString("0.##")%):</td>
                             <td class="text-end">@Model.TaxAmount.ToString("C")</td>
                         </tr>
                         <tr class="border-top border-dark">

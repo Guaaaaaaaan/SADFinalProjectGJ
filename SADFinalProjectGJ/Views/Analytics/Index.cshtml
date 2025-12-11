@@ -1,0 +1,241 @@
+﻿@model SADFinalProjectGJ.ViewModels.AnalyticsViewModel
+@{
+    ViewData["Title"] = "Business Analytics";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 mb-0 text-gray-800">📊 Business Analytics Dashboard</h2>
+        <div>
+            <a asp-action="ExportToExcel" class="btn btn-sm btn-success shadow-sm me-2">
+                <i class="bi bi-file-earmark-excel-fill text-white"></i> Export Excel
+            </a>
+
+            <a href="#" class="btn btn-sm btn-primary shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer-fill text-white-50"></i> Print Report
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Revenue (Lifetime)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                @Model.TotalRevenue.ToString("C")
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-currency-dollar fs-2 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Revenue (This Month)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                @Model.MonthlyRevenue.ToString("C")
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-calendar-check fs-2 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Pending Invoices (Draft/Sent)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                @Model.PendingInvoices
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-hourglass-split fs-2 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-xl-12 col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Revenue Trend (Last 6 Months)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area" style="height: 350px;">
+                        <canvas id="revenueTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Invoice Status Distribution</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2" style="height: 300px;">
+                        <canvas id="statusPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Top 5 Best Selling Items</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar" style="height: 300px;">
+                        <canvas id="topItemsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // 通用颜色配置
+    const colors = {
+        primary: '#4e73df',
+        success: '#1cc88a',
+        info: '#36b9cc',
+        warning: '#f6c23e',
+        danger: '#e74a3b',
+        secondary: '#858796',
+        light: '#f8f9fc',
+        dark: '#5a5c69'
+    };
+
+    // 1. 收入趋势图 (Line Chart)
+    var ctxTrend = document.getElementById("revenueTrendChart");
+    var trendChart = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            // 从 Model 获取标签 ["Jan", "Feb", ...]
+            labels: @Json.Serialize(Model.RevenueTrendLabels),
+            datasets: [{
+                label: "Earnings",
+                lineTension: 0.3, // 曲线平滑度
+                backgroundColor: "rgba(78, 115, 223, 0.05)",
+                borderColor: colors.primary,
+                pointRadius: 3,
+                pointBackgroundColor: colors.primary,
+                pointBorderColor: colors.primary,
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: colors.primary,
+                pointHoverBorderColor: colors.primary,
+                pointHitRadius: 10,
+                pointBorderWidth: 2,
+                // 从 Model 获取数据 [1000, 2000, ...]
+                data: @Json.Serialize(Model.RevenueTrendData),
+            }],
+        },
+        options: {
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + context.raw;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. 状态分布图 (Doughnut/Pie Chart)
+    var ctxPie = document.getElementById("statusPieChart");
+    var statusPieChart = new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+            labels: @Json.Serialize(Model.StatusLabels),
+            datasets: [{
+                data: @Json.Serialize(Model.StatusData),
+                backgroundColor: [colors.success, colors.warning, colors.danger, colors.secondary],
+                hoverBackgroundColor: [colors.success, colors.warning, colors.danger, colors.secondary],
+                hoverBorderColor: "rgba(234, 236, 244, 1)",
+            }],
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            cutout: '70%', // 空心圆的大小
+        },
+    });
+
+    // 3. 畅销商品图 (Bar Chart)
+    var ctxBar = document.getElementById("topItemsChart");
+    var topItemsChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: @Json.Serialize(Model.TopItemsLabels),
+            datasets: [{
+                label: "Revenue",
+                backgroundColor: colors.info,
+                hoverBackgroundColor: "#2c9faf",
+                borderColor: "#4e73df",
+                data: @Json.Serialize(Model.TopItemsRevenue),
+            }],
+        },
+        options: {
+            maintainAspectRatio: false,
+            indexAxis: 'y', // 横向柱状图 (如果是 'x' 则是纵向)
+            scales: {
+                x: {
+                    ticks: {
+                        callback: function(value) { return '$' + value; }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+</script>

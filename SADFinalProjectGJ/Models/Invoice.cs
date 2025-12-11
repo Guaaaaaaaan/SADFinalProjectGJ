@@ -41,6 +41,8 @@ namespace SADFinalProjectGJ.Models
         public int ClientId { get; set; }
         public DateTime IssueDate { get; set; }
         public DateTime DueDate { get; set; }
+        public bool IsArchived { get; set; } = false; // 默认为 false (未归档)
+
 
         public Client? Client { get; set; }
         public ICollection<InvoiceItem>? InvoiceItems { get; set; }

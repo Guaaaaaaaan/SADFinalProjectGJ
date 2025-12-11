@@ -10,6 +10,7 @@
 
 	<ItemGroup>
 		<!-- 这里保持 9.0.x 版本 -->
+		<PackageReference Include="ClosedXML" Version="0.105.0" />
 		<PackageReference Include="MailKit" Version="4.14.1" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />

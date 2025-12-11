@@ -7,40 +7,6 @@
     var currentUser = await UserManager.GetUserAsync(User);
     var isClient = User.IsInRole("Client");
 }
-@if (ViewData["CurrentFilter"] != null)
-{
-    <div class="mb-3">
-        <a asp-action="Index" class="btn btn-secondary btn-sm">
-            <i class="bi bi-arrow-counterclockwise"></i> Clear Search & Show All
-        </a>
-    </div>
-}
-
-@if (TempData["Success"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i> @TempData["Success"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-
-@if (TempData["Warning"] != null)
-{
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["Warning"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="bi bi-x-circle-fill me-2"></i> @TempData["Error"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-}
-<!-- 引入 Bootstrap Icons (如果你的 Layout 还没引入的话) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-
 <style>
     /* 自定义样式微调 */
     .card {
@@ -83,6 +49,92 @@
         white-space: nowrap; /* 防止按钮换行 */
     }
 </style>
+
+<div class="card mb-4 shadow-sm">
+    <div class="card-body p-3">
+        <form asp-action="Index" method="get">
+
+            <div class="row g-2 align-items-end">
+
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-muted mb-1">Keywords</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" name="searchString" value="@ViewData["CurrentFilter"]" class="form-control border-start-0" placeholder="Invoice #, Client..." />
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Min $</label>
+                    <input type="number" name="minAmount" value="@ViewData["MinAmount"]" class="form-control" placeholder="0.00" step="0.01" />
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Max $</label>
+                    <input type="number" name="maxAmount" value="@ViewData["MaxAmount"]" class="form-control" placeholder="No Limit" step="0.01" />
+                </div>
+
+                <div class="col-md-4 d-flex gap-2">
+
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-funnel-fill"></i> Filter
+                    </button>
+
+                    @if (ViewData["CurrentFilter"] != null || ViewData["MinAmount"] != null || ViewData["MaxAmount"] != null)
+                    {
+                        <a asp-action="Index" class="btn btn-outline-secondary" title="Clear Search">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    }
+
+                    @if ((bool?)ViewData["ShowArchived"] == true)
+                    {
+                        <a asp-action="Index" asp-route-showArchived="false" class="btn btn-secondary flex-grow-1">
+                            <i class="bi bi-arrow-left"></i> Active
+                        </a>
+                    }
+                    else
+                    {
+                        <a asp-action="Index" asp-route-showArchived="true" class="btn btn-outline-secondary flex-grow-1" title="View Archived Invoices">
+                            <i class="bi bi-archive"></i> Archived
+                        </a>
+                    }
+                </div>
+            </div>
+
+            @if (ViewData["ShowArchived"] != null)
+            {
+                <input type="hidden" name="showArchived" value="@ViewData["ShowArchived"]?.ToString().ToLower()" />
+            }
+        </form>
+    </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Warning"] != null)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["Warning"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-x-circle-fill me-2"></i> @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+<!-- 引入 Bootstrap Icons (如果你的 Layout 还没引入的话) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
 
 <div class="container-fluid py-4">
 
@@ -211,32 +263,70 @@
                                             </span>
                                         </td>
                                         <td class="text-end pe-4 action-column">
-                                            <!-- 操作按钮组：现在使用实体按钮样式 -->
-
                                             <div class="btn-group" role="group" aria-label="Invoice Actions">
 
-                                                <!-- 1. 查看详情 (改为蓝色描边按钮) -->
                                                 <a asp-action="Details" asp-route-id="@item.InvoiceId" class="btn btn-outline-info btn-sm" title="View Details">
-                                                    <i class="bi bi-eye-fill"></i> View
+                                                    <i class="bi bi-eye-fill"></i>
                                                 </a>
 
-                                                <!-- 2. 支付按钮 (仅 Client 且 状态不是 Draft/Paid 可见，绿色实心) -->
                                                 @if (isClient && item.Status != "Paid" && item.Status != "Draft")
                                                 {
                                                     <a asp-controller="Payments" asp-action="Create" asp-route-invoiceId="@item.InvoiceId" class="btn btn-success btn-sm" title="Pay Now">
-                                                        <i class="bi bi-credit-card-fill me-1"></i> Pay
+                                                        <i class="bi bi-credit-card-fill me-1"></i>
                                                     </a>
                                                 }
 
-                                                <!-- 3. 编辑/删除 (仅 Admin/FinanceStaff 且 状态是 Draft 时可见) -->
-                                                @if (!isClient && item.Status == "Draft")
+                                                @if (!isClient)
                                                 {
-                                                    <a asp-action="Edit" asp-route-id="@item.InvoiceId" class="btn btn-outline-secondary btn-sm" title="Edit">
-                                                        <i class="bi bi-pencil-fill"></i>
-                                                    </a>
-                                                    <a asp-action="Delete" asp-route-id="@item.InvoiceId" class="btn btn-outline-danger btn-sm" title="Delete">
-                                                        <i class="bi bi-trash-fill"></i>
-                                                    </a>
+                                                    // Edit 按钮: 未归档且是 Draft 状态时显示 (或者你可以根据需求放宽限制)
+                                                    if (!item.IsArchived && item.Status == "Draft")
+                                                    {
+                                                        <a asp-action="Edit" asp-route-id="@item.InvoiceId" class="btn btn-outline-secondary btn-sm" title="Edit">
+                                                            <i class="bi bi-pencil-fill"></i>
+                                                        </a>
+                                                    }
+
+                                                    // ===========================================
+                                                    // 👇👇👇 这里的逻辑决定了谁能看到什么按钮 👇👇👇
+                                                    // ===========================================
+
+                                                    if (item.IsArchived)
+                                                    {
+                                                        // A. 如果已归档 -> 显示“还原” (Admin & FinanceStaff 都能用)
+                                                        <form asp-action="Restore" asp-route-id="@item.InvoiceId" method="post" style="display:inline;">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-outline-success btn-sm" title="Restore">
+                                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                                            </button>
+                                                        </form>
+
+                                                        // B. 如果已归档 -> 只有 Admin 能“彻底删除”
+                                                        @if (User.IsInRole("Admin"))
+                                                        {
+                                                            <a asp-action="Delete" asp-route-id="@item.InvoiceId" class="btn btn-outline-danger btn-sm" title="Permanent Delete">
+                                                                <i class="bi bi-trash-fill"></i>
+                                                            </a>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        // C. 如果未归档 -> 显示“归档” (Admin & FinanceStaff 都能用)
+                                                        // 这就是 FinanceStaff 用来“删除”发票的按钮
+                                                        <form asp-action="Archive" asp-route-id="@item.InvoiceId" method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to archive this invoice?');">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Archive (Soft Delete)">
+                                                                <i class="bi bi-archive-fill"></i>
+                                                            </button>
+                                                        </form>
+
+                                                        // D. 如果未归档 -> 只有 Admin 能“彻底删除”
+                                                        @if (User.IsInRole("Admin"))
+                                                        {
+                                                            <a asp-action="Delete" asp-route-id="@item.InvoiceId" class="btn btn-outline-danger btn-sm" title="Permanent Delete">
+                                                                <i class="bi bi-trash-fill"></i>
+                                                            </a>
+                                                        }
+                                                    }
                                                 }
                                             </div>
                                         </td>

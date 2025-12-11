@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization; // 权限控制
-using Microsoft.AspNetCore.Identity;      // 用户身份
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using SADFinalProjectGJ.Data;
 using SADFinalProjectGJ.Models;
-using SADFinalProjectGJ.ViewModels;       // 确保引用了 ViewModel
+using SADFinalProjectGJ.ViewModels;
 using SADFinalProjectGJ.Services;
 
 namespace SADFinalProjectGJ.Controllers
@@ -19,9 +19,8 @@ namespace SADFinalProjectGJ.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<IdentityUser> _userManager;
-        private readonly IEmailService _emailService; // 2. 声明变量
+        private readonly IEmailService _emailService;
 
-        // 3. 修改构造函数，注入 IEmailService
         public InvoicesController(ApplicationDbContext context, UserManager<IdentityUser> userManager, IEmailService emailService)
         {
             _context = context;
@@ -30,35 +29,43 @@ namespace SADFinalProjectGJ.Controllers
         }
 
         // GET: Invoices
-        public async Task<IActionResult> Index(string searchString)
+        public async Task<IActionResult> Index(string searchString, decimal? minAmount, decimal? maxAmount, bool showArchived = false)
         {
-            // 1. 基础查询：预加载 Client 数据
             var query = _context.Invoices.Include(i => i.Client).AsQueryable();
 
-            // 2. 权限控制 (Security Filter)
-            // 必须在搜索前执行：Client 只能在自己的数据池里搜
             if (User.IsInRole("Client"))
             {
                 var currentUserId = _userManager.GetUserId(User);
                 query = query.Where(i => i.Client.UserId == currentUserId);
             }
 
-            // 3. 多字段搜索 (Search Filter)
+            // 如果 showArchived 是 true，只看归档的；否则只看没归档的
+            query = query.Where(i => i.IsArchived == showArchived);
+
             if (!string.IsNullOrEmpty(searchString))
             {
-                // 支持搜索：发票号、客户名、状态、金额
                 query = query.Where(i =>
                     i.InvoiceNumber.Contains(searchString) ||
                     (i.Client != null && i.Client.Name.Contains(searchString)) ||
-                    (i.Status != null && i.Status.Contains(searchString)) ||
-                    // 将金额转为字符串进行模糊匹配 (例如搜 "200" 能找到 "200.00")
-                    i.TotalAmount.ToString().Contains(searchString)//注意，这种写法（把数字转成字符串再搜索）会导致数据库没法利用索引，数据量大了会变得非常慢（Full Table Scan）。
+                    (i.Status != null && i.Status.Contains(searchString)) 
+                    //|| i.TotalAmount.ToString().Contains(searchString)
                 );
             }
+            if (minAmount.HasValue)
+            {
+                query = query.Where(i => i.TotalAmount >= minAmount.Value);
+            }
 
-            // 将搜索词回传给前端，保持输入框里有字
+            if (maxAmount.HasValue)
+            {
+                query = query.Where(i => i.TotalAmount <= maxAmount.Value);
+            }
+
+            // 👇 4. 把搜索条件传回给 View，让输入框保持填写的数值
             ViewData["CurrentFilter"] = searchString;
-
+            ViewData["MinAmount"] = minAmount;
+            ViewData["MaxAmount"] = maxAmount;
+            ViewData["ShowArchived"] = showArchived;
             return View(await query.ToListAsync());
         }
 
@@ -92,7 +99,6 @@ namespace SADFinalProjectGJ.Controllers
         public IActionResult Create()
         {
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name");
-            // 确保你 Items 表里有数据，否则下拉框是空的
             ViewBag.ItemList = _context.Items.ToList();
             return View(new InvoiceCreateViewModel());
         }
@@ -111,7 +117,7 @@ namespace SADFinalProjectGJ.Controllers
                     ClientId = model.ClientId,
                     IssueDate = DateTime.Now,
                     DueDate = model.DueDate,
-                    Status = "Draft",
+                    Status = "Draft", // 建议：创建时通常默认为 Draft，确认无误后再改为 Sent
                     InvoiceItems = new List<InvoiceItem>()
                 };
 
@@ -125,7 +131,6 @@ namespace SADFinalProjectGJ.Controllers
                         if (dbItem != null)
                         {
                             var lineTotal = dbItem.UnitPrice * entry.Quantity;
-
                             var invoiceItem = new InvoiceItem
                             {
                                 ItemId = entry.ItemId,
@@ -133,23 +138,21 @@ namespace SADFinalProjectGJ.Controllers
                                 UnitPrice = dbItem.UnitPrice,
                                 Total = lineTotal
                             };
-
                             invoice.InvoiceItems.Add(invoiceItem);
                             calculatedTotal += lineTotal;
                         }
                     }
                 }
 
+                // 使用用户输入的 GstRate 计算税额
                 invoice.TotalAmount = calculatedTotal;
-                invoice.TaxAmount = calculatedTotal * 0.09m;
+                invoice.TaxAmount = calculatedTotal * (model.GstRate / 100m);
 
-                // 2. 保存发票到数据库
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();
 
-                // 3. 尝试发送邮件 (非阻塞式，失败不影响流程)
+                // 发送邮件逻辑
                 var client = await _context.Clients.FindAsync(model.ClientId);
-
                 if (client != null && !string.IsNullOrEmpty(client.AccountEmail))
                 {
                     try
@@ -159,9 +162,8 @@ namespace SADFinalProjectGJ.Controllers
 
                         await _emailService.SendEmailAsync(client.AccountEmail, subject, body);
 
-                        TempData["Success"] = $"Invoice {invoice.InvoiceNumber} Generation is Sucessful，Notification Email Has Been Send！";
+                        TempData["Success"] = $"Invoice {invoice.InvoiceNumber} created successfully and email sent!";
 
-                        // 记录通知
                         var notification = new Notification
                         {
                             RecipientEmail = client.AccountEmail,
@@ -176,19 +178,17 @@ namespace SADFinalProjectGJ.Controllers
                     }
                     catch (Exception ex)
                     {
-                        // 优化点：不要抛出异常，而是记录日志，或者在 TempData 里提示用户
-                        // _logger.LogError(ex, "邮件发送失败"); // 如果你注入了 Logger
-                        TempData["Warning"] = $"Invoice {invoice.InvoiceNumber} Generation is Sucessful，BUT Notification Email Has NOT Been Send！Reason：{ex.Message}";
-                        return RedirectToAction(nameof(Index)); // 依然跳转，因为发票已经创建成功了
+                        TempData["Warning"] = $"Invoice created, but email failed: {ex.Message}";
                     }
                 }
                 else
                 {
-                    TempData["Warning"] = $"Invoice {invoice.InvoiceNumber} Generation is Sucessful. However, The User Did NOT Have An Email Address, So No Notification Was Sent.";
+                    TempData["Warning"] = "Invoice created, but client has no email.";
                 }
 
                 return RedirectToAction(nameof(Index));
             }
+
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", model.ClientId);
             ViewBag.ItemList = _context.Items.ToList();
             return View(model);
@@ -201,17 +201,23 @@ namespace SADFinalProjectGJ.Controllers
             if (id == null) return NotFound();
 
             var invoice = await _context.Invoices
-                .Include(i => i.InvoiceItems) // 必须包含原有商品
+                .Include(i => i.InvoiceItems)
                 .FirstOrDefaultAsync(m => m.InvoiceId == id);
 
             if (invoice == null) return NotFound();
 
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", invoice.ClientId);
 
-            // ✅ 修复点：只选择需要的字段，防止 JSON 序列化报错
             ViewBag.ItemList = await _context.Items
                 .Select(i => new { i.ItemId, i.Description, i.UnitPrice })
                 .ToListAsync();
+
+            decimal currentRate = 9;
+            if (invoice.TotalAmount > 0)
+            {
+                currentRate = Math.Round((invoice.TaxAmount / invoice.TotalAmount) * 100, 2);
+            }
+            ViewData["CurrentGstRate"] = currentRate;
 
             return View(invoice);
         }
@@ -220,15 +226,12 @@ namespace SADFinalProjectGJ.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,FinanceStaff")]
-        // 3. 修改：在 Bind 中添加 "InvoiceItems"，允许绑定商品列表
-        public async Task<IActionResult> Edit(int id, [Bind("InvoiceId,InvoiceNumber,Status,Notes,TotalAmount,TaxAmount,ClientId,IssueDate,DueDate,InvoiceItems")] Invoice invoice)
+        public async Task<IActionResult> Edit(int id, [Bind("InvoiceId,InvoiceNumber,Status,Notes,TotalAmount,TaxAmount,ClientId,IssueDate,DueDate,InvoiceItems")] Invoice invoice, decimal gstRate)
         {
             if (id != invoice.InvoiceId) return NotFound();
 
-            // ✅ 修复点：移除对 Items 细节的校验，因为我们会在下面手动处理
             ModelState.Remove("InvoiceItems");
 
-            // 4. 读取数据库中的原始数据（为了追踪更新）
             var dbInvoice = await _context.Invoices
                 .Include(i => i.InvoiceItems)
                 .FirstOrDefaultAsync(i => i.InvoiceId == id);
@@ -239,7 +242,6 @@ namespace SADFinalProjectGJ.Controllers
             {
                 try
                 {
-                    // 5. 更新基本字段
                     dbInvoice.InvoiceNumber = invoice.InvoiceNumber;
                     dbInvoice.Status = invoice.Status;
                     dbInvoice.Notes = invoice.Notes;
@@ -247,8 +249,7 @@ namespace SADFinalProjectGJ.Controllers
                     dbInvoice.IssueDate = invoice.IssueDate;
                     dbInvoice.DueDate = invoice.DueDate;
 
-                    // 6. 处理 InvoiceItems (核心逻辑)
-                    // 策略：清空旧的 -> 重新添加新的
+                    // 清空旧项目，重新添加
                     if (dbInvoice.InvoiceItems != null)
                     {
                         _context.InvoiceItems.RemoveRange(dbInvoice.InvoiceItems);
@@ -257,23 +258,19 @@ namespace SADFinalProjectGJ.Controllers
                     dbInvoice.InvoiceItems = new List<InvoiceItem>();
                     decimal calculatedTotal = 0;
 
-                    // 遍历前端提交进来的 invoice.InvoiceItems
                     if (invoice.InvoiceItems != null && invoice.InvoiceItems.Count > 0)
                     {
                         foreach (var itemInput in invoice.InvoiceItems)
                         {
-                            // 即使前端只传了 ItemId 和 Quantity，我们需要去数据库查单价
                             var dbItem = await _context.Items.FindAsync(itemInput.ItemId);
                             if (dbItem != null)
                             {
                                 var lineTotal = dbItem.UnitPrice * itemInput.Quantity;
-
-                                // 创建新的实体加入列表
                                 dbInvoice.InvoiceItems.Add(new InvoiceItem
                                 {
                                     ItemId = itemInput.ItemId,
                                     Quantity = itemInput.Quantity,
-                                    UnitPrice = dbItem.UnitPrice, // 使用最新单价
+                                    UnitPrice = dbItem.UnitPrice,
                                     Total = lineTotal
                                 });
                                 calculatedTotal += lineTotal;
@@ -281,9 +278,9 @@ namespace SADFinalProjectGJ.Controllers
                         }
                     }
 
-                    // 7. 重新计算总金额
+                    // 重新计算总额和税额
                     dbInvoice.TotalAmount = calculatedTotal;
-                    dbInvoice.TaxAmount = calculatedTotal * 0.09m; // 假设税率 9%
+                    dbInvoice.TaxAmount = calculatedTotal * (gstRate / 100m); // 使用 Edit 传入的 gstRate
 
                     _context.Update(dbInvoice);
                     await _context.SaveChangesAsync();
@@ -296,11 +293,10 @@ namespace SADFinalProjectGJ.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // 失败回滚
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", invoice.ClientId);
             ViewBag.ItemList = _context.Items.ToList();
             return View(invoice);
-        }
+        } // ✅ 这里正确关闭 Edit 方法
 
         // GET: Invoices/Delete/5
         [Authorize(Roles = "Admin,FinanceStaff")]
@@ -319,7 +315,7 @@ namespace SADFinalProjectGJ.Controllers
         // POST: Invoices/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Admin,FinanceStaff")]
+        [Authorize(Roles = "Admin,、")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var invoice = await _context.Invoices.FindAsync(id);
@@ -332,6 +328,37 @@ namespace SADFinalProjectGJ.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // POST: Invoices/Archive/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,FinanceStaff")]
+        public async Task<IActionResult> Archive(int id)
+        {
+            var invoice = await _context.Invoices.FindAsync(id);
+            if (invoice == null) return NotFound();
+
+            invoice.IsArchived = true; // 标记为归档
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Invoice {invoice.InvoiceNumber} has been archived.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // POST: Invoices/Restore/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,FinanceStaff")]
+        public async Task<IActionResult> Restore(int id)
+        {
+            var invoice = await _context.Invoices.FindAsync(id);
+            if (invoice == null) return NotFound();
+
+            invoice.IsArchived = false; // 还原
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Invoice {invoice.InvoiceNumber} has been restored.";
+            return RedirectToAction(nameof(Index), new { showArchived = true }); // 还原后停留在归档页方便查看
+        }
         private bool InvoiceExists(int id)
         {
             return _context.Invoices.Any(e => e.InvoiceId == id);
