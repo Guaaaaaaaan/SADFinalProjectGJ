@@ -81,7 +81,7 @@ namespace SADFinalProjectGJ.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,FinanceStaff")] // ✅ 保护 POST
-        public async Task<IActionResult> Create([Bind("ClientId,UserId,Name,CompanyName,Phone,Address")] Client client)
+        public async Task<IActionResult> Create([Bind("ClientId,UserId,Name,CompanyName,Phone,Address,AccountEmail")] Client client)
         {
             if (ModelState.IsValid)
             {
@@ -123,7 +123,7 @@ namespace SADFinalProjectGJ.Controllers
         // POST: Clients/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("ClientId,UserId,Name,CompanyName,Phone,Address")] Client client)
+        public async Task<IActionResult> Edit(int id, [Bind("ClientId,UserId,Name,CompanyName,Phone,Address,AccountEmail")] Client client)
         {
             if (id != client.ClientId) return NotFound();
 

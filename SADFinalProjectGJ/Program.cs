@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using SADFinalProjectGJ.Data;
 using Stripe;
+using SADFinalProjectGJ.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,12 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.Requ
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddControllersWithViews();
+
+// 1. 注册邮件服务 (你之前加的)
+builder.Services.AddTransient<IEmailService, EmailService>();
+
+// 2. 注册后台自动化服务
+builder.Services.AddHostedService<InvoiceReminderService>();
 
 // ... ?????? ...
 

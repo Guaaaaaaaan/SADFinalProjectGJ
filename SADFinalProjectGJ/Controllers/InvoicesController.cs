@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;      // 用户身份
 using SADFinalProjectGJ.Data;
 using SADFinalProjectGJ.Models;
 using SADFinalProjectGJ.ViewModels;       // 确保引用了 ViewModel
+using SADFinalProjectGJ.Services;
 
 namespace SADFinalProjectGJ.Controllers
 {
@@ -18,11 +19,14 @@ namespace SADFinalProjectGJ.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<IdentityUser> _userManager;
+        private readonly IEmailService _emailService; // 2. 声明变量
 
-        public InvoicesController(ApplicationDbContext context, UserManager<IdentityUser> userManager)
+        // 3. 修改构造函数，注入 IEmailService
+        public InvoicesController(ApplicationDbContext context, UserManager<IdentityUser> userManager, IEmailService emailService)
         {
             _context = context;
             _userManager = userManager;
+            _emailService = emailService;
         }
 
         // GET: Invoices
@@ -121,6 +125,7 @@ namespace SADFinalProjectGJ.Controllers
                         if (dbItem != null)
                         {
                             var lineTotal = dbItem.UnitPrice * entry.Quantity;
+
                             var invoiceItem = new InvoiceItem
                             {
                                 ItemId = entry.ItemId,
@@ -140,6 +145,53 @@ namespace SADFinalProjectGJ.Controllers
 
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();
+
+               // ==================== 🛠️ 调试模式：强行检查数据 ====================
+                
+                // 1. 重新获取客户信息
+                var client = await _context.Clients.FindAsync(model.ClientId);
+
+                // 检查 A: 客户是否存在？
+                if (client == null)
+                {
+                    throw new Exception($"【调试错误】找不到 ID 为 {model.ClientId} 的客户！");
+                }
+
+                // 检查 B: 邮箱是否为空？(这是最可能的原因！！！)
+                if (string.IsNullOrEmpty(client.AccountEmail))
+                {
+                    throw new Exception($"【调试错误】客户 '{client.Name}' 的 AccountEmail 字段是空的！系统不知道该往哪里发邮件。\n请去 'Clients' 页面编辑这个客户，并在 'Account Email' 一栏填入你的测试邮箱。");
+                }
+
+                // 如果上面都通过了，说明数据没问题，开始尝试发送
+                try 
+                {
+                    string subject = $"New Invoice Created: {invoice.InvoiceNumber}";
+                    string body = $"Dear {client.Name},<br/>A new invoice <b>{invoice.InvoiceNumber}</b> has been created.<br/>Total: {invoice.TotalAmount:C}";
+                    
+                    // 发送！
+                    await _emailService.SendEmailAsync(client.AccountEmail, subject, body);
+
+                    // 记录通知
+                    var notification = new Notification
+                    {
+                        RecipientEmail = client.AccountEmail,
+                        Subject = subject,
+                        Message = "Invoice created.",
+                        SentDate = DateTime.Now,
+                        Status = "Sent",
+                        UserId = client.UserId
+                    };
+                    _context.Add(notification);
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    // 如果是密码错或连不上 Gmail，这里会报错
+                    throw new Exception($"【邮件发送失败】请检查 appsettings.json 配置。错误信息: {ex.Message}");
+                }
+                // ==================== 调试模式结束 ====================
+
                 return RedirectToAction(nameof(Index));
             }
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", model.ClientId);

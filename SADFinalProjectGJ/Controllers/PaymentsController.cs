@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SADFinalProjectGJ.Services; // 1. 添加引用
 
 namespace SADFinalProjectGJ.Controllers
 {
@@ -18,11 +19,14 @@ namespace SADFinalProjectGJ.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<IdentityUser> _userManager;
+        private readonly IEmailService _emailService; // 2. 声明变量
 
-        public PaymentsController(ApplicationDbContext context, UserManager<IdentityUser> userManager)
+        // 3. 修改构造函数
+        public PaymentsController(ApplicationDbContext context, UserManager<IdentityUser> userManager, IEmailService emailService)
         {
             _context = context;
             _userManager = userManager;
+            _emailService = emailService;
         }
 
         // GET: Payments
@@ -172,7 +176,11 @@ namespace SADFinalProjectGJ.Controllers
                 return BadRequest("Invalid payment information.");
             }
 
-            var invoice = await _context.Invoices.FindAsync(invoiceId);
+            // ✅ 修改点 1: 必须 Include(Client) 才能拿到邮箱
+            var invoice = await _context.Invoices
+                .Include(i => i.Client)
+                .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
+
             if (invoice == null) return NotFound();
 
             // 2. 检查是否已经保存过这个 TransactionId，防止刷新页面重复扣款
@@ -198,9 +206,37 @@ namespace SADFinalProjectGJ.Controllers
                 _context.Update(invoice);
 
                 await _context.SaveChangesAsync();
+                // ==================== ✅ 新增：支付成功通知 ====================
+                try
+                {
+                    if (invoice.Client != null && !string.IsNullOrEmpty(invoice.Client.AccountEmail))
+                    {
+                        string subject = $"Payment Confirmation: {invoice.InvoiceNumber}";
+                        string body = $"Dear {invoice.Client.Name},<br/>We have received your payment for Invoice <b>{invoice.InvoiceNumber}</b>.<br/>Amount: {payment.Amount:C}<br/>Status: Paid";
+
+                        await _emailService.SendEmailAsync(invoice.Client.AccountEmail, subject, body);
+
+                        var notification = new Notification
+                        {
+                            RecipientEmail = invoice.Client.AccountEmail,
+                            Subject = subject,
+                            Message = $"Payment for {invoice.InvoiceNumber} confirmed.",
+                            SentDate = DateTime.Now,
+                            Status = "Sent",
+                            UserId = invoice.Client.UserId,
+                            InvoiceId = invoice.InvoiceId // 如果你的 Model 里有 InvoiceId 字段
+                        };
+                        _context.Add(notification);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Payment notification failed: {ex.Message}");
+                }
+                // ==================== 结束新增逻辑 ====================
             }
 
-            // 5. 显示成功页面
             return View("Success");
         }
         // GET: Payments/Delete/5
