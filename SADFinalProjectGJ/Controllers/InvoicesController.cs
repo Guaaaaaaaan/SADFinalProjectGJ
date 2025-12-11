@@ -52,7 +52,7 @@ namespace SADFinalProjectGJ.Controllers
                     (i.Client != null && i.Client.Name.Contains(searchString)) ||
                     (i.Status != null && i.Status.Contains(searchString)) ||
                     // 将金额转为字符串进行模糊匹配 (例如搜 "200" 能找到 "200.00")
-                    i.TotalAmount.ToString().Contains(searchString)
+                    i.TotalAmount.ToString().Contains(searchString)//注意，这种写法（把数字转成字符串再搜索）会导致数据库没法利用索引，数据量大了会变得非常慢（Full Table Scan）。
                 );
             }
 
@@ -143,54 +143,49 @@ namespace SADFinalProjectGJ.Controllers
                 invoice.TotalAmount = calculatedTotal;
                 invoice.TaxAmount = calculatedTotal * 0.09m;
 
+                // 2. 保存发票到数据库
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();
 
-               // ==================== 🛠️ 调试模式：强行检查数据 ====================
-                
-                // 1. 重新获取客户信息
+                // 3. 尝试发送邮件 (非阻塞式，失败不影响流程)
                 var client = await _context.Clients.FindAsync(model.ClientId);
 
-                // 检查 A: 客户是否存在？
-                if (client == null)
+                if (client != null && !string.IsNullOrEmpty(client.AccountEmail))
                 {
-                    throw new Exception($"【调试错误】找不到 ID 为 {model.ClientId} 的客户！");
-                }
-
-                // 检查 B: 邮箱是否为空？(这是最可能的原因！！！)
-                if (string.IsNullOrEmpty(client.AccountEmail))
-                {
-                    throw new Exception($"【调试错误】客户 '{client.Name}' 的 AccountEmail 字段是空的！系统不知道该往哪里发邮件。\n请去 'Clients' 页面编辑这个客户，并在 'Account Email' 一栏填入你的测试邮箱。");
-                }
-
-                // 如果上面都通过了，说明数据没问题，开始尝试发送
-                try 
-                {
-                    string subject = $"New Invoice Created: {invoice.InvoiceNumber}";
-                    string body = $"Dear {client.Name},<br/>A new invoice <b>{invoice.InvoiceNumber}</b> has been created.<br/>Total: {invoice.TotalAmount:C}";
-                    
-                    // 发送！
-                    await _emailService.SendEmailAsync(client.AccountEmail, subject, body);
-
-                    // 记录通知
-                    var notification = new Notification
+                    try
                     {
-                        RecipientEmail = client.AccountEmail,
-                        Subject = subject,
-                        Message = "Invoice created.",
-                        SentDate = DateTime.Now,
-                        Status = "Sent",
-                        UserId = client.UserId
-                    };
-                    _context.Add(notification);
-                    await _context.SaveChangesAsync();
+                        string subject = $"New Invoice Created: {invoice.InvoiceNumber}";
+                        string body = $"Dear {client.Name},<br/>A new invoice <b>{invoice.InvoiceNumber}</b> has been created.<br/>Total: {invoice.TotalAmount:C}";
+
+                        await _emailService.SendEmailAsync(client.AccountEmail, subject, body);
+
+                        TempData["Success"] = $"Invoice {invoice.InvoiceNumber} Generation is Sucessful，Notification Email Has Been Send！";
+
+                        // 记录通知
+                        var notification = new Notification
+                        {
+                            RecipientEmail = client.AccountEmail,
+                            Subject = subject,
+                            Message = "Invoice created notification sent.",
+                            SentDate = DateTime.Now,
+                            Status = "Sent",
+                            UserId = client.UserId
+                        };
+                        _context.Add(notification);
+                        await _context.SaveChangesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        // 优化点：不要抛出异常，而是记录日志，或者在 TempData 里提示用户
+                        // _logger.LogError(ex, "邮件发送失败"); // 如果你注入了 Logger
+                        TempData["Warning"] = $"Invoice {invoice.InvoiceNumber} Generation is Sucessful，BUT Notification Email Has NOT Been Send！Reason：{ex.Message}";
+                        return RedirectToAction(nameof(Index)); // 依然跳转，因为发票已经创建成功了
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    // 如果是密码错或连不上 Gmail，这里会报错
-                    throw new Exception($"【邮件发送失败】请检查 appsettings.json 配置。错误信息: {ex.Message}");
+                    TempData["Warning"] = $"Invoice {invoice.InvoiceNumber} Generation is Sucessful. However, The User Did NOT Have An Email Address, So No Notification Was Sent.";
                 }
-                // ==================== 调试模式结束 ====================
 
                 return RedirectToAction(nameof(Index));
             }
