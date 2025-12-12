@@ -21,11 +21,16 @@ namespace SADFinalProjectGJ.Areas.Identity.Pages.Account
     {
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
+        private readonly UserManager<IdentityUser> _userManager;
 
-        public LoginModel(SignInManager<IdentityUser> signInManager, ILogger<LoginModel> logger)
+        // 👇 2. 在参数里加上 UserManager<IdentityUser> userManager
+        public LoginModel(SignInManager<IdentityUser> signInManager,
+                          ILogger<LoginModel> logger,
+                          UserManager<IdentityUser> userManager) // 参数加在这里
         {
             _signInManager = signInManager;
             _logger = logger;
+            _userManager = userManager; // 👈 3. 赋值给上面的变量
         }
 
         /// <summary>
@@ -65,7 +70,8 @@ namespace SADFinalProjectGJ.Areas.Identity.Pages.Account
             ///     directly from your code. This API may change or be removed in future releases.
             /// </summary>
             [Required]
-            [EmailAddress]
+            // [EmailAddress] // 👈 1. 删掉或注释掉这个属性！因为用户名不一定是邮箱格式
+            [Display(Name = "Username / Email")] // 👈 2. 改个名字
             public string Email { get; set; }
 
             /// <summary>
@@ -109,9 +115,22 @@ namespace SADFinalProjectGJ.Areas.Identity.Pages.Account
 
             if (ModelState.IsValid)
             {
+                var userName = Input.Email; // 假设用户填的是用户名
+
+                // 👇 如果输入包含 @，说明填的是邮箱，我们要手动找回用户名
+                if (userName.Contains("@"))
+                {
+                    var user = await _userManager.FindByEmailAsync(Input.Email);
+                    if (user != null)
+                    {
+                        userName = user.UserName;
+                    }
+                }
+
                 // This doesn't count login failures towards account lockout
                 // To enable password failures to trigger account lockout, set lockoutOnFailure: true
                 var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
