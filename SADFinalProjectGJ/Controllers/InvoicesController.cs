@@ -151,40 +151,7 @@ namespace SADFinalProjectGJ.Controllers
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();
 
-                // 发送邮件逻辑
-                var client = await _context.Clients.FindAsync(model.ClientId);
-                if (client != null && !string.IsNullOrEmpty(client.AccountEmail))
-                {
-                    try
-                    {
-                        string subject = $"New Invoice Created: {invoice.InvoiceNumber}";
-                        string body = $"Dear {client.Name},<br/>A new invoice <b>{invoice.InvoiceNumber}</b> has been created.<br/>Total: {invoice.TotalAmount:C}";
-
-                        await _emailService.SendEmailAsync(client.AccountEmail, subject, body);
-
-                        TempData["Success"] = $"Invoice {invoice.InvoiceNumber} created successfully and email sent!";
-
-                        var notification = new Notification
-                        {
-                            RecipientEmail = client.AccountEmail,
-                            Subject = subject,
-                            Message = "Invoice created notification sent.",
-                            SentDate = DateTime.Now,
-                            Status = "Sent",
-                            UserId = client.UserId
-                        };
-                        _context.Add(notification);
-                        await _context.SaveChangesAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        TempData["Warning"] = $"Invoice created, but email failed: {ex.Message}";
-                    }
-                }
-                else
-                {
-                    TempData["Warning"] = "Invoice created, but client has no email.";
-                }
+                TempData["Success"] = $"Invoice {invoice.InvoiceNumber} created as Draft. Please review and send.";
 
                 return RedirectToAction(nameof(Index));
             }
@@ -194,6 +161,77 @@ namespace SADFinalProjectGJ.Controllers
             return View(model);
         }
 
+        // POST: Invoices/SendInvoice/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,FinanceStaff")] // 只有管理员/财务能发
+        public async Task<IActionResult> SendInvoice(int id)
+        {
+            var invoice = await _context.Invoices
+                .Include(i => i.Client)
+                .FirstOrDefaultAsync(i => i.InvoiceId == id);
+
+            if (invoice == null) return NotFound();
+
+            // 只有 Draft 状态才能发送 (防止重复发送)
+            if (invoice.Status != "Draft")
+            {
+                TempData["Error"] = "Only Draft invoices can be sent.";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+
+            if (invoice.Client == null || string.IsNullOrEmpty(invoice.Client.AccountEmail))
+            {
+                TempData["Error"] = "Client email is missing.";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+
+            try
+            {
+                // 1. 发送邮件
+                string subject = $"Invoice Ready: {invoice.InvoiceNumber}";
+                string paymentLink = Url.Action("Details", "Payments", new { id = invoice.InvoiceId }, Request.Scheme);
+
+                string body = $@"
+                    <h3>Dear {invoice.Client.Name},</h3>
+                    <p>Your invoice <b>{invoice.InvoiceNumber}</b> has been generated.</p>
+                    <p><b>Total Amount:</b> {invoice.TotalAmount + invoice.TaxAmount:C}</p>
+                    <p><b>Due Date:</b> {invoice.DueDate:yyyy-MM-dd}</p>
+    
+                    <p>Please <a href='{paymentLink}'>click here</a> to view details and pay securely.</p>
+    
+                    <br/>
+                    <p>Thank you.</p>";
+
+                await _emailService.SendEmailAsync(invoice.Client.AccountEmail, subject, body);
+
+                // 2. 更新状态
+                invoice.Status = "Sent";
+                _context.Update(invoice);
+
+                // 3. 记录通知日志
+                var notification = new Notification
+                {
+                    RecipientEmail = invoice.Client.AccountEmail,
+                    Subject = subject,
+                    Message = "Invoice sent via manual trigger.",
+                    SentDate = DateTime.Now,
+                    Status = "Sent",
+                    UserId = invoice.Client.UserId,
+                    InvoiceId = invoice.InvoiceId
+                };
+                _context.Add(notification);
+
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Invoice sent successfully!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Failed to send email: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Details), new { id = id });
+        }
         // GET: Invoices/Edit/5
         [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> Edit(int? id)
@@ -206,6 +244,16 @@ namespace SADFinalProjectGJ.Controllers
 
             if (invoice == null) return NotFound();
 
+            // ==========================================
+            //  安全修复 1: 防止通过 URL 进入编辑页面
+            // ==========================================
+            if (invoice.Status != "Draft")
+            {
+                TempData["Error"] = "Access Denied: Only Draft invoices can be edited.";
+                // 强制跳转回详情页
+                return RedirectToAction(nameof(Details), new { id = invoice.InvoiceId });
+            }
+            // ==========================================
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name", invoice.ClientId);
 
             ViewBag.ItemList = await _context.Items
@@ -237,6 +285,17 @@ namespace SADFinalProjectGJ.Controllers
                 .FirstOrDefaultAsync(i => i.InvoiceId == id);
 
             if (dbInvoice == null) return NotFound();
+
+            // ==========================================
+            // 🔥 安全修复 2: 后端逻辑锁 (最关键！)
+            // 即使攻击者绕过了前端界面，这里也会拦截修改请求
+            // ==========================================
+            if (dbInvoice.Status != "Draft")
+            {
+                TempData["Error"] = "Security Alert: Cannot modify an invoice that has already been sent.";
+                return RedirectToAction(nameof(Details), new { id = id });
+            }
+            // ==========================================
 
             if (ModelState.IsValid)
             {
@@ -315,7 +374,7 @@ namespace SADFinalProjectGJ.Controllers
         // POST: Invoices/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Admin,、")]
+        [Authorize(Roles = "Admin,")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var invoice = await _context.Invoices.FindAsync(id);

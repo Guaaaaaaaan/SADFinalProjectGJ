@@ -50,6 +50,7 @@
     }
 </style>
 
+
 <div class="container mt-5 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-4 no-print">
         <div>
@@ -57,31 +58,48 @@
                 <i class="bi bi-arrow-left"></i> Back to List
             </a>
         </div>
-        <div class="btn-toolbar">
 
-            @if (Model.Status == "Draft")
-            {@* 增加判断：只有状态是 Draft 且 当前用户不是 Client 时，才显示编辑按钮 *@
-                @if (!User.IsInRole("Client"))
-                {
-                    <a asp-action="Edit" asp-route-id="@Model.InvoiceId" class="btn btn-warning me-2">
-                        <i class="bi bi-pencil"></i> Edit
-                    </a>
-                }
+        <div class="d-flex align-items-center gap-2 no-print">
+
+            @* 1. 草稿状态下的操作按钮 *@
+            @if (Model.Status == "Draft" && (User.IsInRole("Admin") || User.IsInRole("FinanceStaff")))
+            {
+                <a asp-action="Edit" asp-route-id="@Model?.InvoiceId" class="btn btn-warning">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+
+                <form asp-action="SendInvoice" asp-route-id="@Model.InvoiceId" method="post"
+                      onsubmit="return confirm('Are you sure you want to send this invoice via email?');"
+                      class="m-0">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-send-fill"></i> Send Invoice
+                    </button>
+                </form>
+            }
+            @* 2. 已发送状态下的提示按钮 *@
+            else if (Model.Status == "Sent")
+            {
+                <button class="btn btn-outline-success" disabled>
+                    <i class="bi bi-check-circle-fill"></i> Invoice Sent
+                </button>
             }
 
-            @if (Model.Status != "Paid")
+            @* 3. 支付按钮 (只要没付款且不是草稿，通常都允许支付，或者是 Overdue) *@
+            @if (Model.Status != "Paid" && Model.Status != "Draft")
             {
                 <a asp-controller="Payments"
                    asp-action="Create"
                    asp-route-invoiceId="@Model.InvoiceId"
-                   class="btn btn-success btn-lg me-2">
-                    <i class="bi bi-credit-card"></i> Pay Now
+                   class="btn btn-success">
+                    <i class="bi bi-credit-card-2-front-fill"></i> Pay Now
                 </a>
             }
 
-            <button onclick="window.print()" class="btn btn-primary btn-lg">
-                <i class="bi bi-printer"></i> Print / Download PDF
+            @* 4. 打印按钮 *@
+            <button onclick="window.print()" class="btn btn-primary">
+                <i class="bi bi-printer-fill"></i> Print / PDF
             </button>
+
         </div>
     </div>
 

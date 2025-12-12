@@ -33,5 +33,11 @@ namespace SADFinalProjectGJ.ViewModels
         // ==============================
         public string[] TopItemsLabels { get; set; } = Array.Empty<string>();
         public decimal[] TopItemsRevenue { get; set; } = Array.Empty<decimal>();
+
+        // ==============================
+        // 5. 账龄分析 (Aging Report)
+        // ==============================
+        public int[] AgingData { get; set; } = Array.Empty<int>();
+        public string[] AgingLabels { get; set; } = Array.Empty<string>();
     }
 }

@@ -23,13 +23,13 @@
                                 <select asp-for="ClientId" class="form-control" asp-items="ViewBag.ClientId"></select>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                     @*    <div class="col-md-6">
                             <div class="form-group">
                                 <label asp-for="DueDate" class="control-label">Due Date</label>
                                 <input asp-for="DueDate" class="form-control" />
                                 <span asp-validation-for="DueDate" class="text-danger"></span>
                             </div>
-                        </div>
+                        </div> *@
                         <div class="col-md-6 mb-3">
                             <label asp-for="DueDate" class="form-label fw-bold">Due Date</label>
                             <input asp-for="DueDate" class="form-control" />

@@ -121,6 +121,20 @@
             </div>
         </div>
     </div>
+    <div class="row">
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-danger">Overdue Aging Report</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="agingChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -235,6 +249,37 @@
             },
             plugins: {
                 legend: { display: false }
+            }
+        }
+    });
+
+        // 4. 账龄分析图 (Bar Chart)
+    // ==============================
+    var ctxAging = document.getElementById("agingChart");
+    var agingChart = new Chart(ctxAging, {
+        type: 'bar', // 柱状图
+        data: {
+            labels: @Json.Serialize(Model.AgingLabels), // ["1-30 Days", ...]
+            datasets: [{
+                label: "Overdue Count",
+                backgroundColor: "#e74a3b", // 用红色表示警告
+                hoverBackgroundColor: "#c0392b",
+                borderColor: "#e74a3b",
+                data: @Json.Serialize(Model.AgingData), // [5, 2, 1]
+            }],
+        },
+        options: {
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1 // 因为是数量，所以只要整数刻度
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false } // 不需要图例
             }
         }
     });

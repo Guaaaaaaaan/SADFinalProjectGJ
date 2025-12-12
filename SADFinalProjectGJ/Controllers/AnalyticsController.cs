@@ -93,9 +93,27 @@ namespace SADFinalProjectGJ.Controllers
             var topItemsLabels = topItems.Select(x => x.Name).ToArray();
             var topItemsRevenue = topItems.Select(x => x.Revenue).ToArray();
 
+            // 6. 准备图表数据 - 账龄分析 (Aging Report)
+            // ==========================================
+            var overdueInvoices = invoices.Where(i => i.Status == "Overdue" && i.DueDate < DateTime.Now).ToList();
+
+            var agingData = new int[3]; // [1-30天, 31-60天, 60+天]
+            var agingLabels = new string[] { "1-30 Days", "31-60 Days", "60+ Days" };
+
+            foreach (var inv in overdueInvoices)
+            {
+                var daysOverdue = (DateTime.Now - inv.DueDate).Days;
+
+                if (daysOverdue <= 30)
+                    agingData[0]++;
+                else if (daysOverdue <= 60)
+                    agingData[1]++;
+                else
+                    agingData[2]++;
+            }
 
             // ==========================================
-            // 6. 填充 ViewModel 并返回
+            // 7. 填充 ViewModel 并返回
             // ==========================================
             var viewModel = new AnalyticsViewModel
             {
@@ -110,7 +128,10 @@ namespace SADFinalProjectGJ.Controllers
                 StatusData = statusData,
 
                 TopItemsLabels = topItemsLabels!,
-                TopItemsRevenue = topItemsRevenue
+                TopItemsRevenue = topItemsRevenue,
+
+                AgingLabels = agingLabels,
+                AgingData = agingData
             };
 
             return View(viewModel);
