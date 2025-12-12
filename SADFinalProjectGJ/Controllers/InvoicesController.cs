@@ -20,12 +20,15 @@ namespace SADFinalProjectGJ.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<IdentityUser> _userManager;
         private readonly IEmailService _emailService;
-
-        public InvoicesController(ApplicationDbContext context, UserManager<IdentityUser> userManager, IEmailService emailService)
+        private readonly IAuditService _auditService; // 新增变量
+                                                      
+        // 新增 auditService
+        public InvoicesController(ApplicationDbContext context, UserManager<IdentityUser> userManager, IEmailService emailService, IAuditService auditService)
         {
             _context = context;
             _userManager = userManager;
             _emailService = emailService;
+            _auditService = auditService; //新增赋值
         }
 
         // GET: Invoices
@@ -96,11 +99,15 @@ namespace SADFinalProjectGJ.Controllers
 
         // GET: Invoices/Create
         [Authorize(Roles = "Admin,FinanceStaff")]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
             ViewData["ClientId"] = new SelectList(_context.Clients, "ClientId", "Name");
             ViewBag.ItemList = _context.Items.ToList();
-            return View(new InvoiceCreateViewModel());
+
+            var gstSetting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == "GstRate");
+
+            decimal defaultRate = gstSetting != null && decimal.TryParse(gstSetting.Value, out decimal rate) ? rate : 9m;
+            return View(new InvoiceCreateViewModel { GstRate = defaultRate });
         }
 
         // POST: Invoices/Create
@@ -121,8 +128,17 @@ namespace SADFinalProjectGJ.Controllers
                     InvoiceItems = new List<InvoiceItem>()
                 };
 
-                decimal calculatedTotal = 0;
+                // 🔒 后端安全检查：确定最终使用的 GST 税率
+                decimal finalGstRate = model.GstRate;
 
+                // 如果当前用户不是 Admin (例如是 FinanceStaff)，强制使用系统设置的税率
+                if (!User.IsInRole("Admin"))
+                {
+                    var gstSetting = await _context.SystemSettings.FirstOrDefaultAsync(s => s.Key == "GstRate");
+                    // 如果数据库没设，默认 9
+                    finalGstRate = gstSetting != null && decimal.TryParse(gstSetting.Value, out decimal rate) ? rate : 9m;
+                }
+                // ============================================================
                 if (model.Items != null && model.Items.Count > 0)
                 {
                     foreach (var entry in model.Items)
@@ -139,17 +155,20 @@ namespace SADFinalProjectGJ.Controllers
                                 Total = lineTotal
                             };
                             invoice.InvoiceItems.Add(invoiceItem);
-                            calculatedTotal += lineTotal;
+                            finalGstRate += lineTotal;
                         }
                     }
                 }
 
                 // 使用用户输入的 GstRate 计算税额
-                invoice.TotalAmount = calculatedTotal;
-                invoice.TaxAmount = calculatedTotal * (model.GstRate / 100m);
+                invoice.TotalAmount = finalGstRate;
+                invoice.TaxAmount = finalGstRate * (model.GstRate / 100m);
 
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();
+
+                // 👇 新增
+                await _auditService.LogAsync("Create", "Invoice", invoice.InvoiceId.ToString(), $"Created invoice {invoice.InvoiceNumber}");
 
                 TempData["Success"] = $"Invoice {invoice.InvoiceNumber} created as Draft. Please review and send.";
 
@@ -223,6 +242,10 @@ namespace SADFinalProjectGJ.Controllers
                 _context.Add(notification);
 
                 await _context.SaveChangesAsync();
+
+                // 👇 新增日志记录
+                await _auditService.LogAsync("Send", "Invoice", invoice.InvoiceId.ToString(), $"Sent invoice {invoice.InvoiceNumber} to client");
+
                 TempData["Success"] = "Invoice sent successfully!";
             }
             catch (Exception ex)
@@ -232,6 +255,7 @@ namespace SADFinalProjectGJ.Controllers
 
             return RedirectToAction(nameof(Details), new { id = id });
         }
+
         // GET: Invoices/Edit/5
         [Authorize(Roles = "Admin,FinanceStaff")]
         public async Task<IActionResult> Edit(int? id)
@@ -343,6 +367,10 @@ namespace SADFinalProjectGJ.Controllers
 
                     _context.Update(dbInvoice);
                     await _context.SaveChangesAsync();
+
+                    //👇 新增日志记录
+
+                    await _auditService.LogAsync("Edit", "Invoice", dbInvoice.InvoiceId.ToString(), "Updated invoice details");
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -374,7 +402,7 @@ namespace SADFinalProjectGJ.Controllers
         // POST: Invoices/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Admin,")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var invoice = await _context.Invoices.FindAsync(id);
@@ -384,6 +412,10 @@ namespace SADFinalProjectGJ.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // 👇 新增日志记录
+            await _auditService.LogAsync("Delete", "Invoice", id.ToString(), "Deleted invoice record");
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -398,6 +430,9 @@ namespace SADFinalProjectGJ.Controllers
 
             invoice.IsArchived = true; // 标记为归档
             await _context.SaveChangesAsync();
+
+            // 👇 新增日志记录
+            await _auditService.LogAsync("Archive", "Invoice", id.ToString(), "Archived invoice");
 
             TempData["Success"] = $"Invoice {invoice.InvoiceNumber} has been archived.";
             return RedirectToAction(nameof(Index));
@@ -414,6 +449,9 @@ namespace SADFinalProjectGJ.Controllers
 
             invoice.IsArchived = false; // 还原
             await _context.SaveChangesAsync();
+
+            // 👇 新增日志记录
+            await _auditService.LogAsync("Restore", "Invoice", id.ToString(), "Restored invoice from archive");
 
             TempData["Success"] = $"Invoice {invoice.InvoiceNumber} has been restored.";
             return RedirectToAction(nameof(Index), new { showArchived = true }); // 还原后停留在归档页方便查看

@@ -33,6 +33,8 @@ builder.Services.AddHostedService<InvoiceReminderService>();
 // ?????? "Stripe:SecretKey" ???? secrets.json ??????????
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
+builder.Services.AddScoped<IAuditService, AuditService>();
+
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {

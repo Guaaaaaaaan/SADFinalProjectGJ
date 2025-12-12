@@ -23,5 +23,18 @@ namespace SADFinalProjectGJ.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Report> Reports { get; set; }
         public DbSet<PaymentGateway> PaymentGateways { get; set; }
+        // 新增
+        public DbSet<SystemSetting> SystemSettings { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
+
+        // 可选：在 OnModelCreating 里种子化一条默认税率数据，防止第一次运行报错
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<SystemSetting>().HasData(
+                new SystemSetting { Id = 1, Key = "GstRate", Value = "9", Description = "Default GST Rate (%)" }
+            );
+        }
     }
 }
