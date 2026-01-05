@@ -75,7 +75,7 @@ namespace SADFinalProjectGJ.Controllers
 
             // 算有多少张 Draft 或 Sent 的发票
             model.PendingInvoicesCount = await invoiceQuery
-                .CountAsync(i => i.Status == "Draft" || i.Status == "Sent");
+                .CountAsync(i => i.Status == InvoiceStatus.Draft || i.Status == InvoiceStatus.Sent);
 
             // 算有多少客户 (Client 只能看到 1 个，管理员看到所有)
             model.TotalClientsCount = await clientQuery.CountAsync();

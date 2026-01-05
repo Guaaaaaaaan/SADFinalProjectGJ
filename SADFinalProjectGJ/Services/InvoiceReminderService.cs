@@ -56,16 +56,21 @@ namespace SADFinalProjectGJ.Services
                 var overdueInvoices = await context.Invoices
                     .Include(i => i.Client) // 必须带上 Client 才能发邮件
                     .Where(i => i.DueDate < DateTime.Now
-                                && i.Status != "Paid"
-                                && i.Status != "Overdue")
-                    .ToListAsync();
+                                && i.Status != InvoiceStatus.Paid
+                                && i.Status != InvoiceStatus.Overdue)
+                            //Change from string to Enum
+                            //&& i.Status != "Paid"
+                            //&& i.Status != "Overdue")
+                                .ToListAsync();
 
                 if (overdueInvoices.Any())
                 {
                     foreach (var invoice in overdueInvoices)
                     {
                         // A. 更新状态为 "Overdue"
-                        invoice.Status = "Overdue";
+                        //Change from string to Enum
+                        //invoice.Status = "Overdue";
+                        invoice.Status = InvoiceStatus.Overdue;
 
                         // B. 发送催款邮件
                         if (invoice.Client != null && !string.IsNullOrEmpty(invoice.Client.AccountEmail))

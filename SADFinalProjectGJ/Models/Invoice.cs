@@ -16,11 +16,15 @@ namespace SADFinalProjectGJ.Models
         [StringLength(50)] // 必须写：发票号较短
         public string? InvoiceNumber { get; set; }
 
-        [Required]
-        [StringLength(20)] // 必须写：状态也很短 (e.g., "Paid")
-        public string? Status { get; set; }
+        //[Required]
+        //[StringLength(20)] // 必须写：状态也很短 (e.g., "Paid")
+        //public string? Status { get; set; }
 
-        // 假设你未来加个备注字段，就需要更长
+        //From the code above, I have an enum for InvoiceStatus now
+        [Required]
+        public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
+
+        // 以后可能会有备注
         [StringLength(500)]
         public string? Notes { get; set; }
 

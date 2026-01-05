@@ -1,12 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SADFinalProjectGJ.Data;
+using SADFinalProjectGJ.Models;
 using SADFinalProjectGJ.ViewModels;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using ClosedXML.Excel;
-using System.IO;
 
 namespace SADFinalProjectGJ.Controllers
 {
@@ -40,8 +41,8 @@ namespace SADFinalProjectGJ.Controllers
                 .Where(i => i.IssueDate.Month == currentMonth && i.IssueDate.Year == currentYear)
                 .Sum(i => i.TotalAmount);
 
-            var pendingCount = invoices.Count(i => i.Status == "Draft" || i.Status == "Sent");
-
+            // 🔥 修复: 使用枚举判断 Pending 数量 (Draft 或 Sent)
+            var pendingCount = invoices.Count(i => i.Status == InvoiceStatus.Draft || i.Status == InvoiceStatus.Sent);
 
             // ==========================================
             // 3. 准备图表数据 - 收入趋势 (最近 6 个月)
@@ -67,10 +68,10 @@ namespace SADFinalProjectGJ.Controllers
             // 4. 准备图表数据 - 状态分布 (Pie Chart)
             // ==========================================
             var statusGroups = invoices.GroupBy(i => i.Status)
-                                       .Select(g => new { Status = g.Key, Count = g.Count() })
-                                       .ToList();
+                                        .Select(g => new { Status = g.Key, Count = g.Count() })
+                                        .ToList();
 
-            var statusLabels = statusGroups.Select(g => g.Status).ToArray();
+            var statusLabels = statusGroups.Select(g => g.Status.ToString()).ToArray();
             var statusData = statusGroups.Select(g => g.Count).ToArray();
 
 
@@ -95,7 +96,7 @@ namespace SADFinalProjectGJ.Controllers
 
             // 6. 准备图表数据 - 账龄分析 (Aging Report)
             // ==========================================
-            var overdueInvoices = invoices.Where(i => i.Status == "Overdue" && i.DueDate < DateTime.Now).ToList();
+            var overdueInvoices = invoices.Where(i => i.Status == InvoiceStatus.Overdue && i.DueDate < DateTime.Now).ToList();
 
             var agingData = new int[3]; // [1-30天, 31-60天, 60+天]
             var agingLabels = new string[] { "1-30 Days", "31-60 Days", "60+ Days" };
@@ -124,7 +125,7 @@ namespace SADFinalProjectGJ.Controllers
                 RevenueTrendLabels = trendLabels,
                 RevenueTrendData = trendData.ToArray(),
 
-                StatusLabels = statusLabels!,
+                StatusLabels = statusLabels!, // 这里已经是 string[] 了
                 StatusData = statusData,
 
                 TopItemsLabels = topItemsLabels!,
@@ -179,15 +180,18 @@ namespace SADFinalProjectGJ.Controllers
                     worksheet.Cell(currentRow, 4).Value = inv.DueDate;
                     worksheet.Cell(currentRow, 4).Style.DateFormat.Format = "yyyy-MM-dd";
 
-                    worksheet.Cell(currentRow, 5).Value = inv.Status;
+                    worksheet.Cell(currentRow, 5).Value = inv.Status.ToString();
 
                     // 金额格式化 (货币)
                     worksheet.Cell(currentRow, 6).Value = inv.TotalAmount;
                     worksheet.Cell(currentRow, 6).Style.NumberFormat.Format = "$ #,##0.00";
 
                     // 根据状态给文字上色 (可选)
-                    if (inv.Status == "Paid") worksheet.Cell(currentRow, 5).Style.Font.FontColor = XLColor.Green;
-                    if (inv.Status == "Overdue") worksheet.Cell(currentRow, 5).Style.Font.FontColor = XLColor.Red;
+                    if (inv.Status == InvoiceStatus.Paid)
+                        worksheet.Cell(currentRow, 5).Style.Font.FontColor = XLColor.Green;
+
+                    if (inv.Status == InvoiceStatus.Overdue)
+                        worksheet.Cell(currentRow, 5).Style.Font.FontColor = XLColor.Red;
                 }
 
                 // 自动调整列宽

@@ -62,7 +62,8 @@
         <div class="d-flex align-items-center gap-2 no-print">
 
             @* 1. 草稿状态下的操作按钮 *@
-            @if (Model.Status == "Draft" && (User.IsInRole("Admin") || User.IsInRole("FinanceStaff")))
+            @* @if (Model.Status == "Draft" && (User.IsInRole("Admin") || User.IsInRole("FinanceStaff"))) *@
+            @if (Model.Status == InvoiceStatus.Draft && (User.IsInRole("Admin") || User.IsInRole("FinanceStaff"))) 
             {
                 <a asp-action="Edit" asp-route-id="@Model?.InvoiceId" class="btn btn-warning">
                     <i class="bi bi-pencil-square"></i> Edit
@@ -77,7 +78,8 @@
                 </form>
             }
             @* 2. 已发送状态下的提示按钮 *@
-            else if (Model.Status == "Sent")
+            @* else if (Model.Status == "Sent") *@
+            else if (Model.Status == InvoiceStatus.Draft)
             {
                 <button class="btn btn-outline-success" disabled>
                     <i class="bi bi-check-circle-fill"></i> Invoice Sent
@@ -85,7 +87,7 @@
             }
 
             @* 3. 支付按钮 (只要没付款且不是草稿，通常都允许支付，或者是 Overdue) *@
-            @if (Model.Status != "Paid" && Model.Status != "Draft")
+            @if (Model.Status != InvoiceStatus.Paid && Model.Status != InvoiceStatus.Draft)
             {
                 <a asp-controller="Payments"
                    asp-action="Create"
@@ -120,7 +122,7 @@
                     <p class="mb-1"><strong>Due Date:</strong> @Model.DueDate.ToShortDateString()</p>
                     <p class="mb-0">
                         <strong>Status:</strong>
-                        <span class="badge @(Model.Status == "Paid" ? "bg-success" : "bg-warning text-dark")">
+                        <span class="badge @(Model.Status == InvoiceStatus.Paid ? "bg-success" : "bg-warning text-dark")">
                             @Model.Status
                         </span>
                     </p>

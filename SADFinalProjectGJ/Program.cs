@@ -8,40 +8,43 @@ using Stripe;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
 builder.Services.AddControllersWithViews();
 
-
+// Configure Email Settings
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
-// 1. 注册邮件服务
+// 1. Register Email Service
 builder.Services.AddTransient<IEmailService, EmailService>();
 
-// 2. 注册后台自动化服务
+// 2. Register Background Services (Automation)
 builder.Services.AddHostedService<InvoiceReminderService>();
 
-// ... ?????? ...
-
-// ???????? User Secrets ??? Stripe
-// ?????? "Stripe:SecretKey" ???? secrets.json ??????????
+// 3. Configure Stripe Payment Gateway
+// Ideally, secrets should be loaded from Azure Key Vault or User Secrets in production
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
+// 4. Register Audit Service
 builder.Services.AddScoped<IAuditService, AuditService>();
 
 var app = builder.Build();
+
+// Seed Database
 using (var scope = app.Services.CreateScope())
 {
     await DbInitializer.InitializeAsync(scope.ServiceProvider);
 }
-
-// ... 后面是 app.UseHttpsRedirection(); 等等 ...
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -51,7 +54,7 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    // The default HSTS value is 30 days. You may want to change this for production scenarios.
     app.UseHsts();
 }
 

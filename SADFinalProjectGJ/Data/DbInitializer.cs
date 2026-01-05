@@ -138,7 +138,7 @@ namespace SADFinalProjectGJ.Data
                         ClientId = clientProfile.ClientId,
                         IssueDate = DateTime.Now.AddMonths(-2),
                         DueDate = DateTime.Now.AddMonths(-2).AddDays(14),
-                        Status = "Paid",
+                        Status = InvoiceStatus.Paid,
                         TotalAmount = 1740.00m,
                         TaxAmount = 156.60m, // 9%
                         InvoiceItems = new List<InvoiceItem>
@@ -155,7 +155,7 @@ namespace SADFinalProjectGJ.Data
                         ClientId = clientProfile.ClientId,
                         IssueDate = DateTime.Now.AddMonths(-1),
                         DueDate = DateTime.Now.AddDays(-5), // 5天前到期
-                        Status = "Overdue",
+                        Status = InvoiceStatus.Overdue,
                         TotalAmount = 500.00m,
                         TaxAmount = 45.00m,
                         InvoiceItems = new List<InvoiceItem>
@@ -171,7 +171,7 @@ namespace SADFinalProjectGJ.Data
                         ClientId = clientProfile.ClientId,
                         IssueDate = DateTime.Now,
                         DueDate = DateTime.Now.AddDays(14),
-                        Status = "Draft",
+                        Status = InvoiceStatus.Draft,
                         TotalAmount = 100.00m,
                         TaxAmount = 9.00m,
                         InvoiceItems = new List<InvoiceItem>

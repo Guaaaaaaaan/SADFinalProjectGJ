@@ -49,9 +49,11 @@ namespace SADFinalProjectGJ.Controllers
             {
                 query = query.Where(i =>
                     i.InvoiceNumber.Contains(searchString) ||
-                    (i.Client != null && i.Client.Name.Contains(searchString)) ||
-                    (i.Status != null && i.Status.Contains(searchString)) 
-                    //|| i.TotalAmount.ToString().Contains(searchString)
+                    (i.Client != null && i.Client.Name.Contains(searchString))
+                // I removed status because it's now an enum
+                // || 
+                //(i.Status != null && i.Status.Contains(searchString)) 
+                //|| i.TotalAmount.ToString().Contains(searchString)
                 );
             }
             if (minAmount.HasValue)
@@ -124,7 +126,7 @@ namespace SADFinalProjectGJ.Controllers
                     ClientId = model.ClientId,
                     IssueDate = DateTime.Now,
                     DueDate = model.DueDate,
-                    Status = "Draft", // 建议：创建时通常默认为 Draft，确认无误后再改为 Sent
+                    Status = InvoiceStatus.Draft, //Change From String to Enum 
                     InvoiceItems = new List<InvoiceItem>()
                 };
 
@@ -193,7 +195,9 @@ namespace SADFinalProjectGJ.Controllers
             if (invoice == null) return NotFound();
 
             // 只有 Draft 状态才能发送 (防止重复发送)
-            if (invoice.Status != "Draft")
+            //Change From String to Enum
+            if (invoice.Status != InvoiceStatus.Draft)
+               //(invoice.Status != "Draft")
             {
                 TempData["Error"] = "Only Draft invoices can be sent.";
                 return RedirectToAction(nameof(Details), new { id = id });
@@ -225,7 +229,8 @@ namespace SADFinalProjectGJ.Controllers
                 await _emailService.SendEmailAsync(invoice.Client.AccountEmail, subject, body);
 
                 // 2. 更新状态
-                invoice.Status = "Sent";
+                //Change From String to Enum
+                invoice.Status = InvoiceStatus.Sent;
                 _context.Update(invoice);
 
                 // 3. 记录通知日志
@@ -271,7 +276,9 @@ namespace SADFinalProjectGJ.Controllers
             // ==========================================
             //  安全修复 1: 防止通过 URL 进入编辑页面
             // ==========================================
-            if (invoice.Status != "Draft")
+            //Change From String to Enum
+            //if (invoice.Status != "Draft")
+            if (invoice.Status != InvoiceStatus.Draft)
             {
                 TempData["Error"] = "Access Denied: Only Draft invoices can be edited.";
                 // 强制跳转回详情页
@@ -314,7 +321,11 @@ namespace SADFinalProjectGJ.Controllers
             // 🔥 安全修复 2: 后端逻辑锁 (最关键！)
             // 即使攻击者绕过了前端界面，这里也会拦截修改请求
             // ==========================================
-            if (dbInvoice.Status != "Draft")
+
+            //Change From String to Enum
+            //if (dbInvoice.Status != "Draft")
+
+            if (invoice.Status != InvoiceStatus.Draft)
             {
                 TempData["Error"] = "Security Alert: Cannot modify an invoice that has already been sent.";
                 return RedirectToAction(nameof(Details), new { id = id });

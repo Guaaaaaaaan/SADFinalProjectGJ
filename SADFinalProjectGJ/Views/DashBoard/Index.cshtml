@@ -76,11 +76,11 @@
                             <td>@invoice.IssueDate.ToShortDateString()</td>
                             <td>@((invoice.TotalAmount + invoice.TaxAmount).ToString("C"))</td>
                             <td>
-                                @if (invoice.Status == "Paid")
+                                @if (invoice.Status == InvoiceStatus.Paid)
                                 {
                                     <span class="badge bg-success">Paid</span>
                                 }
-                                else if (invoice.Status == "Draft")
+                                else if (invoice.Status == InvoiceStatus.Draft)
                                 {
                                     <span class="badge bg-secondary">Draft</span>
                                 }

@@ -121,7 +121,8 @@
             <div class="card mb-4">
                 <div class="card-header bg-secondary text-white">
                     Items
-                    @if (Model.Status == "Draft" || Model.InvoiceId == 0)
+                    @* @if (Model.Status == "Draft" || Model.InvoiceId == 0) *@
+                    @if (Model.Status == InvoiceStatus.Draft || Model.InvoiceId == 0)
                     {
                         <button type="button" class="btn btn-sm btn-success float-end" onclick="addItemRow()" style="float: right;">+ Add Item</button>
                     }
@@ -160,7 +161,7 @@
                                     </td>
                                     <td>
                                         @* 只有状态是 Draft 或者是新发票时，才显示删除按钮 *@
-                                        @if (Model.Status == "Draft" || Model.InvoiceId == 0)
+                                        @if (Model.Status == InvoiceStatus.Draft || Model.InvoiceId == 0)
                                         {
                                             @* 添加 confirm 确认框 *@
                                             <button type="button" class="btn btn-danger" onclick="if(confirm('Are you sure you want to remove this item?')) removeRow(this)">Remove</button>

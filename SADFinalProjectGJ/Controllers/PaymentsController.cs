@@ -202,7 +202,7 @@ namespace SADFinalProjectGJ.Controllers
                 _context.Add(payment);
 
                 // 4. 更新发票状态为 Paid
-                invoice.Status = "Paid";
+                invoice.Status = InvoiceStatus.Paid;
                 _context.Update(invoice);
 
                 await _context.SaveChangesAsync();

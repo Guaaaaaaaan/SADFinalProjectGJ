@@ -23,7 +23,7 @@ namespace SADFinalProjectGJ.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Report> Reports { get; set; }
         public DbSet<PaymentGateway> PaymentGateways { get; set; }
-        // 新增
+        // NEW!!!
         public DbSet<SystemSetting> SystemSettings { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
 
@@ -32,6 +32,12 @@ namespace SADFinalProjectGJ.Data
         {
             base.OnModelCreating(builder);
 
+            // Invoice 状态枚举转换为字符串存储
+            builder.Entity<Invoice>()
+                .Property(i => i.Status)
+                .HasConversion<string>();
+
+            // GstRate 系统设置的种子数据
             builder.Entity<SystemSetting>().HasData(
                 new SystemSetting { Id = 1, Key = "GstRate", Value = "9", Description = "Default GST Rate (%)" }
             );
