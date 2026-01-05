@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using SADFinalProjectGJ.Models; // 确保引用您的 Models 命名空间
+using SADFinalProjectGJ.Models;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,7 +17,7 @@ namespace SADFinalProjectGJ.Data
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
             // 确保数据库已创建
-            context.Database.EnsureCreated();
+            await context.Database.MigrateAsync();
 
             // ============================================================
             // 2. 初始化角色 (Roles)
@@ -36,56 +36,74 @@ namespace SADFinalProjectGJ.Data
             // ============================================================
 
             // A. 创建 Admin 用户
-            if (await userManager.FindByEmailAsync("admin@igpts.com") == null)
+            string adminEmail = "admin@igpts.com";
+            var adminUser = await userManager.FindByEmailAsync(adminEmail);
+
+            // 1. 如果用户不存在，先创建
+            if (adminUser == null)
             {
-                var adminUser = new IdentityUser
+                adminUser = new IdentityUser
                 {
-                    UserName = "admin", // 您之前的 Username 分离功能
-                    Email = "admin@igpts.com",
+                    UserName = "admin",
+                    Email = adminEmail,
                     EmailConfirmed = true
                 };
-                var result = await userManager.CreateAsync(adminUser, "Password123!"); // 默认密码
-                if (result.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(adminUser, "Admin");
-                }
+                var result = await userManager.CreateAsync(adminUser, "Password123!");
+
+                // 如果创建失败（比如密码太简单），直接停止后续操作，防止报错
+                if (!result.Succeeded) return;
             }
 
-            // B. 创建 Finance Staff 用户
-            if (await userManager.FindByEmailAsync("staff@igpts.com") == null)
+
+            // 2. 此时 adminUser 一定不为 null 了。
+            //    不管他是刚创建的，还是老用户，只要没角色，就加上。
+            if (!await userManager.IsInRoleAsync(adminUser, "Admin"))
             {
-                var staffUser = new IdentityUser
+                await userManager.AddToRoleAsync(adminUser, "Admin");
+            }
+
+            string staffEmail = "staff@igpts.com";
+            var staffUser = await userManager.FindByEmailAsync(staffEmail);
+            // B. 创建 Finance Staff 用户
+            if (staffUser == null)
+            {
+                staffUser = new IdentityUser
                 {
                     UserName = "staff",
                     Email = "staff@igpts.com",
                     EmailConfirmed = true
                 };
                 var result = await userManager.CreateAsync(staffUser, "Password123!");
-                if (result.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(staffUser, "FinanceStaff");
-                }
+
+                if (!result.Succeeded) return;
+            }
+
+            if (!await userManager.IsInRoleAsync(staffUser, "FinanceStaff"))
+            {
+                await userManager.AddToRoleAsync(staffUser, "FinanceStaff");
             }
 
             // C. 创建 Client 用户 (用于登录查看发票)
-            IdentityUser clientUser = null;
-            if (await userManager.FindByEmailAsync("client@igpts.com") == null)
+
+            string clientEmail = "client@igpts.com";
+            var clientUser = await userManager.FindByEmailAsync(clientEmail);
+
+            if (clientUser == null)
             {
                 clientUser = new IdentityUser
                 {
                     UserName = "demo_client",
-                    Email = "client@igpts.com",
+                    Email = clientEmail,
                     EmailConfirmed = true
                 };
                 var result = await userManager.CreateAsync(clientUser, "Password123!");
-                if (result.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(clientUser, "Client");
-                }
+                if (!result.Succeeded) return; 
             }
-            else
+
+            // 确保有 Client 角色
+            if (!await userManager.IsInRoleAsync(clientUser, "Client"))
             {
-                clientUser = await userManager.FindByEmailAsync("client@igpts.com");
+                await userManager.AddToRoleAsync(clientUser, "Client");
             }
 
             // ============================================================

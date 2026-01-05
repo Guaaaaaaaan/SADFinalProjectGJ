@@ -140,7 +140,9 @@ namespace SADFinalProjectGJ.Controllers
                     // 如果数据库没设，默认 9
                     finalGstRate = gstSetting != null && decimal.TryParse(gstSetting.Value, out decimal rate) ? rate : 9m;
                 }
-                // ============================================================
+
+                decimal calculatedTotal = 0;
+
                 if (model.Items != null && model.Items.Count > 0)
                 {
                     foreach (var entry in model.Items)
@@ -156,15 +158,17 @@ namespace SADFinalProjectGJ.Controllers
                                 UnitPrice = dbItem.UnitPrice,
                                 Total = lineTotal
                             };
+
                             invoice.InvoiceItems.Add(invoiceItem);
-                            finalGstRate += lineTotal;
+
+                            calculatedTotal += lineTotal;
                         }
                     }
                 }
 
                 // 使用用户输入的 GstRate 计算税额
-                invoice.TotalAmount = finalGstRate;
-                invoice.TaxAmount = finalGstRate * (model.GstRate / 100m);
+                invoice.TotalAmount = calculatedTotal;
+                invoice.TaxAmount = calculatedTotal * (model.GstRate / 100m);
 
                 _context.Add(invoice);
                 await _context.SaveChangesAsync();

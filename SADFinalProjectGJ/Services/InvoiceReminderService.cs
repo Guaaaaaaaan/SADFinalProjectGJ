@@ -39,7 +39,7 @@ namespace SADFinalProjectGJ.Services
                 // === 💤 休息时间 ===
                 // 为了演示方便，我们设置为每 1 分钟检查一次
                 // 如果是正式上线，这里通常是 Task.Delay(TimeSpan.FromHours(24), stoppingToken);
-                await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
         }
 
